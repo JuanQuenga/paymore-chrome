@@ -46,8 +46,6 @@ function toolToDisplayName(tool) {
       return "Shopify Inventory Search";
     case "shopify-storefront":
       return "Shopify Storefront";
-    case "grok":
-      return "Grok AI Assistant";
     case "ebay":
       return "eBay Categories";
     case "paymore":

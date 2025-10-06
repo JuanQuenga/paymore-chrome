@@ -1,15 +1,13 @@
-/* global chrome */
+declare const chrome: any;
 
-// Offscreen: semantic engine removed. Minimal placeholder listener kept to
+// Offscreen: minimal placeholder listener kept to
 // avoid breaking code that may send messages to the offscreen target.
 
-console.log("Offscreen: semantic engine removed");
+console.log("Offscreen: placeholder loaded");
 
-chrome.runtime.onMessage.addListener((message: any, _sender, sendResponse) => {
-  sendResponse({ success: false, error: "similarity_engine_removed" });
-  return true;
-});
-
-console.log("Offscreen placeholder loaded");
-
-
+chrome.runtime.onMessage.addListener(
+  (message: any, _sender: any, sendResponse: any) => {
+    sendResponse({ success: false, error: "offscreen_placeholder" });
+    return true;
+  }
+);

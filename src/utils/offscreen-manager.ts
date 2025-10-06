@@ -1,3 +1,4 @@
+declare const chrome: any;
 export class OffscreenManager {
   private static instance: OffscreenManager | null = null;
   private isCreated = false;
@@ -36,7 +37,7 @@ export class OffscreenManager {
     await chrome.offscreen.createDocument({
       url: "offscreen.html",
       reasons: ["WORKERS"],
-      justification: "Run semantic similarity engine and workers",
+      justification: "Run workers for extension functionality",
     });
     this.isCreated = true;
   }
@@ -50,5 +51,3 @@ export class OffscreenManager {
 }
 
 export const offscreenManager = OffscreenManager.getInstance();
-
-

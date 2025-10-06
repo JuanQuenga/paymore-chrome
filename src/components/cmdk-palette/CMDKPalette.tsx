@@ -301,7 +301,7 @@ export function CMDKPalette({
       if (looksLikeLocalhost || looksLikeDomain) {
         return new URL(`https://${value}`).href;
       }
-    } catch (_) {}
+    } catch (error) {}
 
     return null;
   };

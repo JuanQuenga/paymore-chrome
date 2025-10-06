@@ -19,7 +19,6 @@ export default defineBackground({
      * This service worker handles:
      * - Extension installation and startup
      * - Message routing between content scripts and popup
-     * - Chat polling and session management
      * - Side panel state management
      * - Storage configuration
      * - Tab communication and injection
@@ -30,26 +29,11 @@ export default defineBackground({
     /** @type {boolean} Debug mode flag for console logging */
     let DEBUG = true;
 
-    /** @type {number|null} Timer for chat polling functionality */
-    let CHAT_POLL_TIMER = null;
-
-    /** @type {number} Timestamp of last chat activity */
-    let LAST_CHAT_TS = 0;
-
     /**
      * @type {Map<number, {open: boolean, tool: string}>}
      * Track side panel state per tab for toggle/switch functionality
      */
     const SIDE_PANEL_STATE = new Map(); // tabId -> { open: boolean, tool: string }
-
-    const STORAGE_STATS_KEY = "grokStorageStats";
-    const DEFAULT_STORAGE_STATS = {
-      indexedPages: 0,
-      totalDocuments: 0,
-      totalTabs: 0,
-      indexSize: 0,
-      isInitialized: false,
-    };
     const DEFAULT_ACTION_POPUP = "popup.html";
     const OPTIONS_ACTION_POPUP = "options.html";
 
@@ -88,21 +72,47 @@ export default defineBackground({
     // Track previous active tab for CMDK "return to previous tab" feature
     let previousActiveTabId = null;
     let lastActiveTabId = null;
+    let currentActiveTabId = null; // Track current active tab for sidePanel.open user gesture requirement
+
+    // Initialize currentActiveTabId on startup
+    chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
+      if (tabs && tabs[0]) {
+        currentActiveTabId = tabs[0].id;
+        log("Initial active tab ID:", currentActiveTabId);
+      }
+    });
+
     chrome.tabs.onActivated.addListener(({ tabId }) => {
       try {
         if (lastActiveTabId && lastActiveTabId !== tabId) {
           previousActiveTabId = lastActiveTabId;
         }
         lastActiveTabId = tabId;
-      } catch (_) {}
+        currentActiveTabId = tabId; // Update current active tab for sidepanel opening
+        log("Active tab changed to:", tabId);
+      } catch (error) {
+        /* noop */
+      }
     });
     // Clean up tracking if tabs are closed
     try {
       chrome.tabs.onRemoved.addListener((closedTabId) => {
         if (previousActiveTabId === closedTabId) previousActiveTabId = null;
         if (lastActiveTabId === closedTabId) lastActiveTabId = null;
+        if (currentActiveTabId === closedTabId) {
+          currentActiveTabId = null;
+          // Try to update to another active tab
+          chrome.tabs.query(
+            { active: true, lastFocusedWindow: true },
+            (tabs) => {
+              if (tabs && tabs[0]) currentActiveTabId = tabs[0].id;
+            }
+          );
+        }
       });
-    } catch (_) {}
+    } catch (error) {
+      /* noop */
+    }
 
     // Listen for keyboard commands
     chrome.commands.onCommand.addListener((command) => {
@@ -118,6 +128,14 @@ export default defineBackground({
         openOptionsAsActionPopup().catch((error) =>
           log("openOptions command handler error", error)
         );
+      } else if (command === "open-toolbar-sidepanel") {
+        log("Open toolbar sidepanel command triggered");
+        chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
+          const active = tabs && tabs[0];
+          if (active?.id) {
+            toggleSidePanelForTab(active.id, "floating-toolbar");
+          }
+        });
       }
     });
 
@@ -129,7 +147,9 @@ export default defineBackground({
       // Ensure no stale items
       try {
         chrome.contextMenus.removeAll(() => {});
-      } catch (_) {}
+      } catch (error) {
+        log("Suppressed error", error);
+      }
 
       try {
         chrome.contextMenus.create({
@@ -156,7 +176,7 @@ export default defineBackground({
               const q = encodeURIComponent(selection);
               const url = EBAY_SOLD_BASE.replace(/_nkw=[^&]*/, `_nkw=${q}`);
               chrome.tabs.create({ url });
-            } catch (_) {
+            } catch (error) {
               log("Failed to open eBay search for selection", selection);
             }
           }
@@ -165,7 +185,9 @@ export default defineBackground({
 
         // only eBay handler kept
       });
-    } catch (_) {}
+    } catch (error) {
+      /* noop */
+    }
 
     // Provide a fetch fallback for content scripts that cannot fetch extension
     // resources directly due to page restrictions. Content scripts can request
@@ -185,7 +207,9 @@ export default defineBackground({
           return true; // keep channel open for async response
         }
       });
-    } catch (_) {}
+    } catch (error) {
+      log("Suppressed error", error);
+    }
 
     /**
      * Handles extension installation and initial setup
@@ -206,7 +230,6 @@ export default defineBackground({
         disabledSites: [],
         currentSiteEnabled: true,
         globalEnabled: true,
-        selectedModel: "multilingual-e5-small",
       });
     });
 
@@ -222,8 +245,8 @@ export default defineBackground({
     });
 
     /**
-     * Handles extension startup and initializes chat polling
-     * Loads debug configuration and starts chat functionality
+     * Handles extension startup and configuration loading
+     * Updates debug settings
      */
     chrome.runtime.onStartup?.addListener(() => {
       log("onStartup");
@@ -231,8 +254,6 @@ export default defineBackground({
         DEBUG = !!cfg.debugLogs;
         log("Debug flag loaded", DEBUG);
       });
-      // Kick off chat poller
-      tryStartChatPoller();
     });
 
     /**
@@ -299,7 +320,7 @@ export default defineBackground({
     function getManifestContentScripts() {
       try {
         return chrome.runtime.getManifest()?.content_scripts || [];
-      } catch (_) {
+      } catch (error) {
         return [];
       }
     }
@@ -315,12 +336,16 @@ export default defineBackground({
         (entry.css || []).forEach((file) => {
           try {
             chrome.scripting.insertCSS({ target, files: [file] });
-          } catch (_) {}
+          } catch (error) {
+            /* noop */
+          }
         });
         (entry.js || []).forEach((file) => {
           try {
             chrome.scripting.executeScript({ target, files: [file] });
-          } catch (_) {}
+          } catch (error) {
+            /* noop */
+          }
         });
       });
     }
@@ -427,7 +452,9 @@ export default defineBackground({
                     height: 640,
                     focused: true,
                   });
-                } catch (_) {}
+                } catch (error) {
+                  log("Suppressed error", error);
+                }
               }
               notifyPopup();
             });
@@ -441,7 +468,9 @@ export default defineBackground({
                 height: 640,
                 focused: true,
               });
-            } catch (_) {}
+            } catch (error) {
+              log("Suppressed error", error);
+            }
             notifyPopup();
           }
           sendResponse({ success: true });
@@ -482,7 +511,7 @@ export default defineBackground({
               };
               openToolNear(tool, anchor, 0.4);
             });
-          } catch (_) {
+          } catch (error) {
             openToolNear(tool, { x: 1200, y: 600 }, 0.4);
           }
           sendResponse({ success: true });
@@ -495,7 +524,7 @@ export default defineBackground({
             sendResponse({ success: false, error: "missing_tool" });
             break;
           }
-          // For chat, open a small chromeless window near the click so it doesn't cover the toolbar
+          // Open tool window near the click
           openToolNear(tool, anchor, 0.4);
           sendResponse({ success: true });
           break;
@@ -545,40 +574,6 @@ export default defineBackground({
           sendToActiveTab({ action: "hideControllerModal" });
           sendResponse({ success: true });
           break;
-        case "GET_WEBPAGE_CONTEXT":
-          // Get webpage context from the active tab
-          chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (tabs.length > 0) {
-              const activeTab = tabs[0];
-              // Send message to content script to get webpage data
-              chrome.tabs.sendMessage(
-                activeTab.id,
-                { action: "GET_WEBPAGE_CONTEXT" },
-                (response) => {
-                  if (chrome.runtime.lastError) {
-                    log(
-                      "Error getting webpage context:",
-                      chrome.runtime.lastError
-                    );
-                    sendResponse({
-                      success: false,
-                      error: "Failed to get webpage context",
-                    });
-                  } else if (response && response.success) {
-                    sendResponse({ success: true, data: response.data });
-                  } else {
-                    sendResponse({
-                      success: false,
-                      error: "No webpage context available",
-                    });
-                  }
-                }
-              );
-            } else {
-              sendResponse({ success: false, error: "No active tab found" });
-            }
-          });
-          return true; // Keep message channel open for async response
         case "getActiveTab":
           // Get the currently active tab
           log("getActiveTab requested");
@@ -699,13 +694,13 @@ export default defineBackground({
           sendResponse({ success: true });
           break;
         case "openPaytonSidepanel": {
-          // Backward compat: treat as toggle for chat tool
-          toggleSidePanelForTab(sender?.tab?.id, "chat");
+          // Backward compat: treat as toggle for default tool
+          toggleSidePanelForTab(sender?.tab?.id, "settings");
           sendResponse({ success: true });
           break;
         }
         case "toggleSidepanelTool": {
-          const tool = message?.tool || "chat";
+          const tool = message?.tool || "settings";
           toggleSidePanelForTab(sender?.tab?.id, tool);
           sendResponse({ success: true });
           break;
@@ -722,21 +717,6 @@ export default defineBackground({
           // QR Scanner is now handled by web service, no local window to close
           sendResponse({ success: true });
           break;
-        case "chatAttention": {
-          const important = !!message?.important;
-          const mText = (message?.text || "").toString();
-          const mUser = (message?.user || "").toString();
-          const mRoom = (message?.room || "team").toString();
-          broadcastChatAttention(important);
-          // For important messages, open a minimal alert window once with message payload
-          if (important && mText) {
-            try {
-              openAlertWindow({ text: mText, user: mUser, room: mRoom });
-            } catch (_) {}
-          }
-          sendResponse({ success: true });
-          break;
-        }
         case "setStore": {
           const store = message?.store;
           const room = message?.room;
@@ -763,7 +743,9 @@ export default defineBackground({
                             ? "taylor-store"
                             : "southgate-store"),
                       });
-                    } catch (_) {}
+                    } catch (error) {
+                      log("Suppressed error", error);
+                    }
                   });
                 });
               }
@@ -830,7 +812,9 @@ export default defineBackground({
                     action: "pm-settings-changed",
                     disabledSites: sites,
                   });
-                } catch (_) {}
+                } catch (error) {
+                  log("Suppressed error", error);
+                }
               });
             });
 
@@ -869,7 +853,9 @@ export default defineBackground({
                       action: "pm-settings-changed",
                       disabledSites: updatedSites,
                     });
-                  } catch (_) {}
+                  } catch (error) {
+                    log("Suppressed error", error);
+                  }
                 });
               });
 
@@ -895,27 +881,23 @@ export default defineBackground({
       return true; // keep the message channel open if needed
     });
 
-    // React to settings changes for chat notifications
-    try {
-      chrome.storage.onChanged.addListener((changes, area) => {
-        if (area !== "local") return;
-        if (changes.pmChatAttnAll || changes.scannerBaseUrl) {
-          tryStartChatPoller();
-        }
-      });
-    } catch (_) {}
-
     // QR Scanner functionality - now handled by web service
 
     function openCheckoutPrices() {
       log("Opening Checkout Prices from web service");
       // Use sidebar instead of action popup
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
         const active = tabs && tabs[0];
         if (active?.id) {
           toggleSidePanelForTab(active.id, "checkout-prices");
         } else {
           log("openCheckoutPrices: no active tab id");
+          // Fallback: try to get any tab and open there
+          chrome.tabs.query({}, (allTabs) => {
+            if (allTabs.length > 0) {
+              toggleSidePanelForTab(allTabs[0].id, "checkout-prices");
+            }
+          });
         }
       });
     }
@@ -923,12 +905,18 @@ export default defineBackground({
     function openControllerTest() {
       log("Opening Controller Test from web service");
       // Use sidebar instead of action popup
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
         const active = tabs && tabs[0];
         if (active?.id) {
           toggleSidePanelForTab(active.id, "controller-testing");
         } else {
           log("openControllerTest: no active tab id");
+          // Fallback: try to get any tab and open there
+          chrome.tabs.query({}, (allTabs) => {
+            if (allTabs.length > 0) {
+              toggleSidePanelForTab(allTabs[0].id, "controller-testing");
+            }
+          });
         }
       });
     }
@@ -992,16 +980,14 @@ export default defineBackground({
               enabled: true,
               path: "sidepanel.html",
             });
-          } catch (_) {}
+          } catch (error) {
+            log("Failed to normalize action popup URL", error);
+          }
           try {
             chrome.sidePanel.open({ tabId: id }, () => {
               const err = chrome.runtime.lastError;
               if (err) {
                 log("sidePanel open lastError", err.message);
-                // Fallback: open chat tool in popup window
-                if (tool === "chat") {
-                  openToolInCenteredWindow("chat", 0.85);
-                }
               }
             });
           } catch (e) {
@@ -1013,7 +999,9 @@ export default defineBackground({
               sidePanelTool: "qr-session",
               sidePanelUrl: null,
             });
-          } catch (_) {}
+          } catch (error) {
+            log("Suppressed error", error);
+          }
         } catch (e) {
           log("openQRScanner error", e?.message || e);
         }
@@ -1049,33 +1037,7 @@ export default defineBackground({
             }
           }
 
-          // Open or switch to requested tool
-          try {
-            // Enable and open immediately to keep user gesture
-            try {
-              chrome.sidePanel.setOptions({
-                enabled: true,
-                path: "sidepanel.html",
-              });
-            } catch (_) {}
-            chrome.sidePanel.open({ tabId: id }, () => {
-              const err = chrome.runtime.lastError;
-              if (err) {
-                log("sidePanel open lastError", err.message);
-                // Fallback for chat: open in popup window
-                if (tool === "chat") {
-                  openToolInCenteredWindow("chat", 0.85);
-                  return;
-                }
-              } else {
-                SIDE_PANEL_STATE.set(id, { open: true, tool });
-                log(`Sidepanel opened for tool: ${tool}`);
-              }
-            });
-          } catch (e) {
-            log("sidePanel open error", e?.message || e);
-          }
-          // Store desired tool in chrome storage for the sidepanel to pick up
+          // Store desired tool in chrome storage FIRST (before opening)
           try {
             chrome.storage.local.set({
               sidePanelTool: tool,
@@ -1085,16 +1047,59 @@ export default defineBackground({
           } catch (e) {
             log("Failed to set chrome storage for tool:", e?.message || e);
           }
+
+          // Open or switch to requested tool
+          try {
+            // Enable and open immediately to keep user gesture
+            try {
+              chrome.sidePanel.setOptions({
+                enabled: true,
+                path: "sidepanel.html",
+              });
+            } catch (error) {
+              log("Suppressed error", error);
+            }
+            chrome.sidePanel.open({ tabId: id }, () => {
+              const err = chrome.runtime.lastError;
+              if (err) {
+                log("sidePanel open lastError", err.message);
+              } else {
+                SIDE_PANEL_STATE.set(id, { open: true, tool });
+                log(`Sidepanel opened for tool: ${tool}`);
+              }
+            });
+          } catch (e) {
+            log("sidePanel open error", e?.message || e);
+          }
         };
 
-        const id = Number(tabId) || null;
+        const id = Number(tabId) || currentActiveTabId || null;
         if (!id) {
+          log(
+            `toggleSidePanelForTab: no tabId provided and no currentActiveTabId tracked`
+          );
           // Fallback: find current active tab in the focused window
-          chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            const t = tabs && tabs[0];
-            if (t?.id) openForTab(t.id);
-            else log("toggleSidePanelForTab: could not resolve active tab id");
-          });
+          chrome.tabs.query(
+            { active: true, lastFocusedWindow: true },
+            (tabs) => {
+              const t = tabs && tabs[0];
+              if (t?.id) {
+                openForTab(t.id);
+              } else {
+                log(
+                  "toggleSidePanelForTab: no active tab, trying any available tab"
+                );
+                // Second fallback: get any tab
+                chrome.tabs.query({}, (allTabs) => {
+                  if (allTabs.length > 0) {
+                    openForTab(allTabs[0].id);
+                  } else {
+                    log("toggleSidePanelForTab: no tabs available at all");
+                  }
+                });
+              }
+            }
+          );
           return;
         }
         openForTab(id);
@@ -1152,8 +1157,6 @@ export default defineBackground({
           return "/tools/help";
         case "min-reqs":
           return "/tools/min-reqs";
-        case "chat":
-          return "/tools/chat";
         case "shopify-search":
           return "/tools/shopify/search";
         case "shopify-storefront":
@@ -1171,194 +1174,29 @@ export default defineBackground({
     }
 
     function openInActionPopup(tool) {
-      chrome.storage.local.get(
-        {
-          scannerBaseUrl: "https://paymore-extension.vercel.app",
-          pmChatName: "",
-          pcDebug: false,
-          toolsPassword: "",
-        },
-        (cfg) => {
-          const baseUrl = (cfg?.scannerBaseUrl || "").replace(/\/$/, "");
-          const path = toolToPath(tool);
-          let url = `${baseUrl}${path}`;
+      if (tool !== "controller-testing" && tool !== "settings") {
+        log("Unsupported tool for action popup:", tool);
+        return;
+      }
 
-          // Add password to all tool URLs if configured
-          if (cfg?.toolsPassword) {
-            try {
-              const u = new URL(url);
-              u.searchParams.set("password", cfg.toolsPassword);
-              url = u.href;
-            } catch (_) {
-              url = `${url}${
-                url.includes("?") ? "&" : "?"
-              }password=${encodeURIComponent(cfg.toolsPassword)}`;
-            }
-          }
+      const internalPath =
+        tool === "settings" ? "options.html" : "sidepanel.html";
+      const resolvedUrl = chrome.runtime.getURL(internalPath);
 
-          // Size Next.js help tool nicely inside the action popup
-          if (tool === "help") {
-            try {
-              const u = new URL(url);
-              u.searchParams.set("pm_w", "460");
-              u.searchParams.set("pm_h", "560");
-              url = u.href;
-            } catch (_) {
-              url = `${url}${url.includes("?") ? "&" : "?"}pm_w=460&pm_h=560`;
-            }
-          }
-          // Open Price Charting as a large centered chromeless popup (alert-style)
-          if (tool === "price-charting") {
-            try {
-              const u = new URL(url);
-              if (cfg?.pcDebug) u.searchParams.set("pc_debug", "1");
-              u.searchParams.set("pm_window", "1");
-              u.searchParams.set("pm_wp", "0.95");
-              u.searchParams.set("pm_hp", "0.9");
-              u.searchParams.set("pm_margin", "8");
-              url = u.href;
-            } catch (_) {
-              url = `${url}${
-                url.includes("?") ? "&" : "?"
-              }pm_window=1&pm_wp=0.95&pm_hp=0.9&pm_margin=8${
-                cfg?.pcDebug ? "&pc_debug=1" : ""
-              }`;
-            }
-          }
-          // If opening chat, append pm_chat_name param from storage
+      try {
+        chrome.storage.local.set({ actionPopupUrl: resolvedUrl }, () => {
           try {
-            const u = new URL(url);
-            if (tool === "chat" && cfg?.pmChatName) {
-              u.searchParams.set("pm_chat_name", cfg.pmChatName);
-            }
-            // If pm_window=1 is present, open as chromeless popup window with optional sizing/position
-            const windowMode = u.searchParams.get("pm_window") === "1";
-            if (windowMode) {
-              const wp = parseFloat(u.searchParams.get("pm_wp") || "0") || null;
-              const hp = parseFloat(u.searchParams.get("pm_hp") || "0") || null;
-              const margin =
-                parseInt(u.searchParams.get("pm_margin") || "0", 10) || 0;
-              const wFixed =
-                parseInt(u.searchParams.get("pm_w") || "0", 10) || null;
-              const hFixed =
-                parseInt(u.searchParams.get("pm_h") || "0", 10) || null;
-              const leftParam = parseInt(
-                u.searchParams.get("pm_left") || "",
-                10
-              );
-              const topParam = parseInt(u.searchParams.get("pm_top") || "", 10);
-              try {
-                chrome.system.display.getInfo((displays) => {
-                  const d = (displays &&
-                    displays[0] &&
-                    displays[0].workArea) || {
-                    left: 0,
-                    top: 0,
-                    width: 1280,
-                    height: 800,
-                  };
-                  const w = Math.max(
-                    400,
-                    wFixed || (wp ? Math.floor(d.width * wp) : 900)
-                  );
-                  const h = Math.max(
-                    300,
-                    hFixed || (hp ? Math.floor(d.height * hp) : 820)
-                  );
-                  const maxW = d.width - margin * 2;
-                  const maxH = d.height - margin * 2;
-                  const finalW = Math.min(w, maxW);
-                  const finalH = Math.min(h, maxH);
-                  const left = Number.isFinite(leftParam)
-                    ? Math.max(
-                        d.left + margin,
-                        Math.min(d.left + d.width - finalW - margin, leftParam)
-                      )
-                    : Math.max(
-                        d.left + margin,
-                        d.left + Math.floor((d.width - finalW) / 2)
-                      );
-                  const top = Number.isFinite(topParam)
-                    ? Math.max(
-                        d.top + margin,
-                        Math.min(d.top + d.height - finalH - margin, topParam)
-                      )
-                    : Math.max(
-                        d.top + margin,
-                        d.top + Math.floor((d.height - finalH) / 2)
-                      );
-                  // Ensure only one popup at a time: reuse/resize existing popup if present
-                  const createWindow = () =>
-                    chrome.windows.create(
-                      {
-                        url: u.href,
-                        type: "popup",
-                        state: "normal",
-                        width: finalW,
-                        height: finalH,
-                        left,
-                        top,
-                        focused: true,
-                      },
-                      (win) => {
-                        CURRENT_TOOL_POPUP_ID = win?.id || null;
-                        ensureAutoCloseListener();
-                      }
-                    );
-
-                  if (CURRENT_TOOL_POPUP_ID) {
-                    try {
-                      chrome.windows.update(
-                        CURRENT_TOOL_POPUP_ID,
-                        {
-                          state: "normal",
-                          width: finalW,
-                          height: finalH,
-                          left,
-                          top,
-                          focused: true,
-                        },
-                        (win) => {
-                          const err = chrome.runtime.lastError;
-                          if (err || !win) {
-                            CURRENT_TOOL_POPUP_ID = null;
-                            createWindow();
-                          }
-                        }
-                      );
-                    } catch (_) {
-                      CURRENT_TOOL_POPUP_ID = null;
-                      createWindow();
-                    }
-                  } else {
-                    createWindow();
-                  }
-                });
-              } catch (e) {
-                log("windowMode error", e?.message || e);
-                chrome.windows.create({
-                  url: u.href,
-                  type: "popup",
-                  focused: true,
-                });
-              }
-              return;
-            }
-            url = u.href;
-          } catch (_) {}
-          log("openInActionPopup", { tool, url });
-          chrome.storage.local.set({ actionPopupUrl: url }, () => {
-            try {
-              chrome.action.openPopup(() => {
-                const err = chrome.runtime.lastError;
-                if (err) log("openPopup error", err.message);
-              });
-            } catch (e) {
-              log("openPopup threw", e?.message || e);
-            }
-          });
-        }
-      );
+            chrome.action.openPopup(() => {
+              const err = chrome.runtime.lastError;
+              if (err) log("openPopup error", err.message);
+            });
+          } catch (error) {
+            log("openPopup threw", error?.message || error);
+          }
+        });
+      } catch (error) {
+        log("Failed to open action popup", error?.message || error);
+      }
     }
 
     let CURRENT_TOOL_POPUP_ID = null;
@@ -1380,20 +1218,23 @@ export default defineBackground({
               chrome.windows.remove(CURRENT_TOOL_POPUP_ID, () => {});
               CURRENT_TOOL_POPUP_ID = null;
             }
-          } catch (_) {}
+          } catch (error) {
+            log("Suppressed error", error);
+          }
         });
         chrome.windows.onRemoved.addListener((winId) => {
           if (winId === CURRENT_TOOL_POPUP_ID) CURRENT_TOOL_POPUP_ID = null;
         });
         FOCUS_LISTENER_ATTACHED = true;
-      } catch (_) {}
+      } catch (error) {
+        log("Suppressed error", error);
+      }
     }
 
     function openToolInCenteredWindow(tool, percent) {
       chrome.storage.local.get(
         {
           scannerBaseUrl: "https://paymore-extension.vercel.app",
-          pmChatName: "",
           toolsPassword: "",
         },
         (cfg) => {
@@ -1409,21 +1250,13 @@ export default defineBackground({
               const u = new URL(url);
               u.searchParams.set("password", cfg.toolsPassword);
               url = u.href;
-            } catch (_) {
+            } catch (error) {
               url = `${url}${
                 url.includes("?") ? "&" : "?"
               }password=${encodeURIComponent(cfg.toolsPassword)}`;
             }
           }
 
-          // add chat name if applicable
-          try {
-            if (tool === "chat" && cfg?.pmChatName) {
-              const u = new URL(url);
-              u.searchParams.set("pm_chat_name", cfg.pmChatName);
-              url = u.href;
-            }
-          } catch (_) {}
           try {
             chrome.system.display.getInfo((displays) => {
               // Use primary display workArea (excludes taskbars)
@@ -1451,7 +1284,9 @@ export default defineBackground({
                   try {
                     CURRENT_TOOL_POPUP_ID = win?.id || null;
                     ensureAutoCloseListener();
-                  } catch (_) {}
+                  } catch (error) {
+                    log("Suppressed error", error);
+                  }
                 }
               );
             });
@@ -1463,7 +1298,9 @@ export default defineBackground({
                 try {
                   CURRENT_TOOL_POPUP_ID = win?.id || null;
                   ensureAutoCloseListener();
-                } catch (_) {}
+                } catch (error) {
+                  log("Suppressed error", error);
+                }
               }
             );
           }
@@ -1496,7 +1333,7 @@ export default defineBackground({
             }
             LAST_ALERT_FINGERPRINT = fp;
             LAST_ALERT_AT = now;
-            const u = new URL(`${baseUrl}/tools/chat/alert`);
+            const u = new URL(`${baseUrl}/tools/alert`);
 
             // Add password if configured
             if (cfg?.toolsPassword) {
@@ -1557,7 +1394,7 @@ export default defineBackground({
                       }
                     }
                   );
-                } catch (_) {
+                } catch (error) {
                   CURRENT_ALERT_POPUP_ID = null;
                   createWindow();
                 }
@@ -1576,7 +1413,6 @@ export default defineBackground({
       chrome.storage.local.get(
         {
           scannerBaseUrl: "https://paymore-extension.vercel.app",
-          pmChatName: "",
           toolsPassword: "",
         },
         (cfg) => {
@@ -1592,20 +1428,13 @@ export default defineBackground({
               const u = new URL(url);
               u.searchParams.set("password", cfg.toolsPassword);
               url = u.href;
-            } catch (_) {
+            } catch (error) {
               url = `${url}${
                 url.includes("?") ? "&" : "?"
               }password=${encodeURIComponent(cfg.toolsPassword)}`;
             }
           }
 
-          try {
-            if (tool === "chat" && cfg?.pmChatName) {
-              const u = new URL(url);
-              u.searchParams.set("pm_chat_name", cfg.pmChatName);
-              url = u.href;
-            }
-          } catch (_) {}
           const ax = Math.max(0, Number(anchor?.x || 0));
           const ay = Math.max(0, Number(anchor?.y || 0));
           try {
@@ -1664,7 +1493,7 @@ export default defineBackground({
                       }
                     }
                   );
-                } catch (_) {
+                } catch (error) {
                   CURRENT_TOOL_POPUP_ID = null;
                   createWindow();
                 }
@@ -1680,7 +1509,9 @@ export default defineBackground({
                 try {
                   CURRENT_TOOL_POPUP_ID = win?.id || null;
                   ensureAutoCloseListener();
-                } catch (_) {}
+                } catch (error) {
+                  log("Suppressed error", error);
+                }
               }
             );
           }
@@ -1701,76 +1532,6 @@ export default defineBackground({
       } catch (e) {
         log("resizeFocusedPopup error", e?.message || e);
       }
-    }
-
-    function broadcastChatAttention(important) {
-      try {
-        chrome.tabs.query({}, (tabs) => {
-          tabs.forEach((t) => {
-            try {
-              chrome.tabs.sendMessage(t.id, {
-                action: "pm-chat:attention",
-                important: !!important,
-              });
-            } catch (_) {}
-          });
-        });
-      } catch (_) {}
-    }
-
-    function tryStartChatPoller() {
-      try {
-        // Chat polling disabled in development to avoid API errors
-        chrome.storage.local.get(
-          {
-            pmChatAttnAll: false, // Disabled by default
-            scannerBaseUrl: "https://paymore-extension.vercel.app",
-          },
-          (cfg) => {
-            const attnAll = !!cfg?.pmChatAttnAll;
-            // Chat polling is disabled by default to avoid API errors
-            if (!attnAll) {
-              if (CHAT_POLL_TIMER) {
-                clearInterval(CHAT_POLL_TIMER);
-                CHAT_POLL_TIMER = null;
-              }
-              return;
-            }
-            const base = (cfg?.scannerBaseUrl || "").replace(/\/$/, "");
-            const url = `${base}/api/chat`;
-            if (CHAT_POLL_TIMER) clearInterval(CHAT_POLL_TIMER);
-            const tick = async () => {
-              try {
-                const r = await fetch(url);
-                if (!r.ok) {
-                  // If API endpoint doesn't exist, don't spam errors
-                  if (r.status === 404) return;
-                  throw new Error(`HTTP ${r.status}`);
-                }
-                const j = await r.json();
-                const list = Array.isArray(j?.messages) ? j.messages : [];
-                const latestTs = list.reduce(
-                  (m, x) => Math.max(m, Number(x.ts || 0)),
-                  0
-                );
-                if (latestTs > LAST_CHAT_TS) {
-                  const newOnes = list.filter(
-                    (m) => Number(m.ts || 0) > LAST_CHAT_TS
-                  );
-                  const hasImportant = newOnes.some((m) => !!m.important);
-                  broadcastChatAttention(hasImportant);
-                  LAST_CHAT_TS = latestTs;
-                }
-              } catch (e) {
-                log("chat poll error", e?.message || e);
-              }
-            };
-            // Seed last timestamp to avoid storming on first run
-            LAST_CHAT_TS = Date.now();
-            CHAT_POLL_TIMER = setInterval(tick, 5000); // Reduced frequency
-          }
-        );
-      } catch (_) {}
     }
   },
 });

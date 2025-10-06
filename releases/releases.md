@@ -4,7 +4,49 @@ Download the latest and previous versions of the Paymore Chrome Extension.
 
 ## Latest Release
 
-### v1.0.8 (Current)
+### v1.0.9 (Current)
+
+**Release Date:** October 06, 2025
+**Download:** [paymore-chrome-v1.0.9.zip](./paymore-chrome-v1.0.9.zip)
+
+**What's New:**
+
+### Features
+
+- **Release Script Integration**: Added `pnpm release <version>` command to package.json for streamlined release process
+- **Automated Version Management**: Release script now handles version bumping across all configuration files
+- **Build Optimization**: Improved release workflow with automatic zip generation for both GitHub and Chrome Web Store
+- **UI Improvements**: Popup now fills entire window space, dismiss button is smaller and slides up on hover
+
+### Improvements
+
+- **Toolbar Dismiss Animation**: Dismiss button now slides up from toolbar on hover with smooth transitions
+- **Popup Layout**: Full-window responsive layout with proper flexbox structure
+- **Settings Interface**: Cleaner deployment URL input without placeholder text
+- **Keyboard Shortcuts**: Streamlined shortcut system with toolbar sidepanel access
+
+### Bug Fixes
+
+- Fixed dismiss button hover detection across entire toolbar area
+- Corrected popup window sizing to utilize full available space
+- Improved toolbar button spacing and visual hierarchy
+
+### Installation
+
+1. Download [paymore-chrome-v1.0.9.zip](./paymore-chrome-v1.0.9.zip)
+2. Unzip the file
+3. Open Chrome and navigate to `chrome://extensions/`
+4. Enable "Developer mode" (toggle in top right)
+5. Click "Load unpacked"
+6. Select the unzipped `paymore-chrome` folder
+
+Note: The packed version for Chrome Web Store submission is located at `.output/paymore-chrome-v1.0.9-packed.zip`
+
+---
+
+## Previous Releases
+
+### v1.0.8
 
 **Release Date:** October 04, 2025
 **Download:** [paymore-chrome-v1.0.8.zip](./paymore-chrome-v1.0.8.zip)
@@ -161,17 +203,17 @@ Note: The packed version for Chrome Web Store submission is located at `.output/
 
 ## Installation Instructions
 
-1. Download `paymore-chrome-v1.0.7.zip`
+1. Download `paymore-chrome-v1.0.9.zip`
 2. Extract the ZIP file to a folder on your computer
 3. Open Chrome and go to `chrome://extensions/`
 4. Enable "Developer mode" in the top right
 5. Click "Load unpacked"
-6. Navigate to the extracted folder and select the `chrome-mv3/` folder
+6. Navigate to the extracted folder and select the `paymore-chrome/` folder
 7. The extension will be installed and ready to use
 
 ### For Chrome Web Store Submission
 
-The packed version is located at `.output/paymore-chrome-v1.0.7-packed.zip` and is ready for Chrome Web Store upload via the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole)
+The packed version is located at `.output/paymore-chrome-v1.0.9-packed.zip` and is ready for Chrome Web Store upload via the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole)
 
 ## Keyboard Shortcuts Setup
 
@@ -187,13 +229,15 @@ After installation, you can customize keyboard shortcuts:
 ## Notes
 
 - Always download from official releases to ensure security
-- For the latest features and bug fixes, use the current release (v1.0.7)
+- For the latest features and bug fixes, use the current release (v1.0.9)
 - CMDK requires `bookmarks` and `history` permissions (granted on install)
 - Quick Links are cached for 30 minutes in Chrome storage
 - If you encounter issues, check the [CMDK_README.md](../CMDK_README.md) for troubleshooting
 
 ## Changelog Summary
 
+**v1.0.9** - Release script integration, UI improvements, and deployment URL privacy
+**v1.0.8** - Search provider switching, active provider indicators, and toolbar improvements
 **v1.0.7** - Version bump and maintenance release
 **v1.0.6** - CMDK Command Palette, Keyboard Shortcuts, Bookmarks/History Integration
 **v1.0.5** - Patch release with minor fixes

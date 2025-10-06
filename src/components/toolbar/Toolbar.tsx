@@ -15,7 +15,7 @@ function getIconElement(tool: any) {
                 String(tool.img).replace(/^\//, "")
               )
             : String(tool.img).replace(/^\//, "");
-        } catch (_) {
+        } catch (error) {
           return String(tool.img).replace(/^\//, "");
         }
       })();
@@ -29,7 +29,7 @@ function getIconElement(tool: any) {
         />
       );
     }
-  } catch (_) {}
+  } catch (error) {}
   return null;
 }
 
@@ -43,6 +43,11 @@ export default function Toolbar() {
   #paymore-toolbar { position: fixed; right: -100px; top: 50%; transform: translateY(-50%); z-index: 2147483646; opacity: 1; visibility: visible; transition: right 0.3s ease, opacity 0.3s ease, visibility 0.3s ease; }
   #paymore-toolbar.visible { opacity: 1; visibility: visible; right: 9px; }
   #paymore-toolbar.hidden { opacity: 0; visibility: hidden; right: -100px; }
+  /* Dismiss button slide animation */
+  .pm-toolbar-wrapper { position: relative; overflow: visible; }
+  .pm-dismiss-container { position: absolute; top: -42px; left: 50%; transform: translateX(-50%); width: 42px; height: 42px; overflow: hidden; z-index: 5; }
+  .pm-dismiss-btn { position: absolute; top: 42px; left: 50%; transform: translateX(-50%); transition: top 0.3s ease; }
+  .pm-toolbar-wrapper:hover .pm-dismiss-btn { top: 0; }
   /* Color variables (defaults = stone theme) */
   #paymore-toolbar {
     --pm-bg: #1c1917;           /* stone-900 */
@@ -68,8 +73,8 @@ export default function Toolbar() {
   #paymore-toolbar.pm-theme-cyan { --pm-bg: #155e75; --pm-surface: #0e7490; --pm-border: #06b6d4; --pm-border-soft: #22d3ee; --pm-foreground: #ecfeff; --pm-foreground-strong: #ffffff; --pm-hover: #0891b2; }
   #paymore-toolbar.pm-theme-amber { --pm-bg: #78350f; --pm-surface: #92400e; --pm-border: #d97706; --pm-border-soft: #f59e0b; --pm-foreground: #fffbeb; --pm-foreground-strong: #ffffff; --pm-hover: #b45309; }
 
-  .pm-tb { display: flex; flex-direction: column; gap: 6px; padding: 6px; background: var(--pm-bg); border: 1px solid var(--pm-border-soft); border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.45); user-select: none; }
-  .pm-tb-close { width: 40px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: var(--pm-surface); border: 1px solid var(--pm-border); color: var(--pm-foreground); cursor: pointer; position: relative; margin-bottom: 2px; transition: all 0.2s ease; }
+  .pm-tb { display: flex; flex-direction: column; gap: 6px; padding: 6px; background: var(--pm-bg); border: 1px solid var(--pm-border-soft); border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.45); user-select: none; position: relative; z-index: 10; }
+  .pm-tb-close { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 6px; background: var(--pm-surface); border: 1px solid var(--pm-border); color: var(--pm-foreground); cursor: pointer; position: relative; margin-bottom: 2px; transition: all 0.2s ease; }
   .pm-tb-divider { width: 100%; height: 1px; background: var(--pm-border-soft); margin: 0 0 2px 0; border-radius: 0.5px; }
   .pm-tb-item { position: relative; }
   .pm-tb-btn { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px; background: var(--pm-surface); border: 1px solid var(--pm-border); color: var(--pm-foreground); cursor: pointer; position: relative; transition: all 0.2s ease; }
@@ -82,71 +87,48 @@ export default function Toolbar() {
         }}
       />
 
-      <div className="pm-tb" role="toolbar">
-        <div className="pm-tb-item">
-          <button
-            className="pm-tb-close"
-            id="pm-tb-close"
-            aria-label="Dismiss Toolbar"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M18 6L6 18" />
-              <path d="M6 6l12 12" />
-            </svg>
-          </button>
-          <div className="pm-tip">Dismiss (⌘⇧L)</div>
-        </div>
-
-        {/* Settings button placed directly under Dismiss */}
-        <div className="pm-tb-item">
-          <button
-            className="pm-tb-btn"
-            id="pm-tb-settings"
-            aria-label="Settings"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="pm-icon"
-            >
-              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-          </button>
-          <div className="pm-tip">Settings (⌘⇧O)</div>
-        </div>
-
-        <div className="pm-tb-divider" />
-
-        {TOOLBAR_TOOLS.map((tool) => (
-          <div className="pm-tb-item" key={tool.id} style={{ display: "" }}>
-            <button
-              className="pm-tb-btn"
-              id={tool.buttonId}
-              aria-label={tool.label}
-            >
-              {getIconElement(tool)}
-            </button>
-            <div className="pm-tip">{tool.label}</div>
+      {/* Toolbar wrapper for hover effects */}
+      <div className="pm-toolbar-wrapper">
+        <div className="pm-tb" role="toolbar">
+          {/* Dismiss button container with slide animation */}
+          <div className="pm-dismiss-container">
+            <div className="pm-dismiss-btn">
+              <button
+                className="pm-tb-close"
+                id="pm-tb-close"
+                aria-label="Dismiss Toolbar"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M18 6L6 18" />
+                  <path d="M6 6l12 12" />
+                </svg>
+              </button>
+              <div className="pm-tip">Dismiss (⌘⇧L)</div>
+            </div>
           </div>
-        ))}
+          {TOOLBAR_TOOLS.map((tool) => (
+            <div className="pm-tb-item" key={tool.id} style={{ display: "" }}>
+              <button
+                className="pm-tb-btn"
+                id={tool.buttonId}
+                aria-label={tool.label}
+              >
+                {getIconElement(tool)}
+              </button>
+              <div className="pm-tip">{tool.label}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

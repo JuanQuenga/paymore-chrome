@@ -72,6 +72,13 @@ export default defineConfig({
         },
         description: "Dismiss/show toolbar",
       },
+      "open-toolbar-sidepanel": {
+        suggested_key: {
+          default: "Ctrl+Shift+T",
+          mac: "Command+Shift+T",
+        },
+        description: "Open toolbar sidepanel",
+      },
     },
     // Expose toolbar and assets to content scripts
     web_accessible_resources: [

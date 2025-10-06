@@ -131,7 +131,7 @@ function initializeExtension() {
     const inFrame = (() => {
       try {
         return window.top !== window.self;
-      } catch (_) {
+      } catch (error) {
         return true;
       }
     })();
@@ -143,10 +143,10 @@ function initializeExtension() {
           excluded: true,
           reason: "iframe",
         });
-      } catch (_) {}
+      } catch (error) {}
       return;
     }
-  } catch (_) {}
+  } catch (error) {}
 
   // Allow running on localhost/127.0.0.1 for development
 
@@ -176,7 +176,7 @@ function initializeExtension() {
       // Exclude our own popup windows (opened by background with pm_popup=1)
       if (/([?&])pm_popup=1(?!\d)/.test(url)) return true;
       return EXCLUDE_URLS.some((re) => re.test(url));
-    } catch (_) {
+    } catch (error) {
       return false;
     }
   }
@@ -211,7 +211,7 @@ function initializeExtension() {
             const theme = String(cfg?.toolbarTheme || "stone");
             applyToolbarTheme(toolbar as HTMLElement, theme);
           });
-        } catch (_) {}
+        } catch (error) {}
         return;
       }
 
@@ -220,14 +220,14 @@ function initializeExtension() {
         if (t) {
           try {
             o.disconnect();
-          } catch (_) {}
+          } catch (error) {}
           setupToolbar(t);
           try {
             chrome.storage?.local?.get({ toolbarTheme: "stone" }, (cfg) => {
               const theme = String(cfg?.toolbarTheme || "stone");
               applyToolbarTheme(t as HTMLElement, theme);
             });
-          } catch (_) {}
+          } catch (error) {}
         }
       });
       obs.observe(document.documentElement || document.body, {
@@ -240,14 +240,14 @@ function initializeExtension() {
         if (t) {
           try {
             obs.disconnect();
-          } catch (_) {}
+          } catch (error) {}
           setupToolbar(t);
           try {
             chrome.storage?.local?.get({ toolbarTheme: "stone" }, (cfg) => {
               const theme = String(cfg?.toolbarTheme || "stone");
               applyToolbarTheme(t as HTMLElement, theme);
             });
-          } catch (_) {}
+          } catch (error) {}
         }
       }, 2500);
     } catch (e) {
@@ -259,7 +259,7 @@ function initializeExtension() {
     if (!toolbar) return;
     try {
       toolbar.style.display = "block";
-    } catch (_) {}
+    } catch (error) {}
 
     // Add mouse detection for auto-show/hide
     let mouseTimeout: any;
@@ -285,23 +285,6 @@ function initializeExtension() {
       mouseTimeout = setTimeout(hideToolbar, 1000);
     };
     document.addEventListener("mousemove", handleMouseMove, { passive: true });
-
-    const handleChatMessage = (message: any) => {
-      if (
-        message.action === "pm-chat:attention" ||
-        message.action === "pm-chat:show" ||
-        message.action === "pm-chat:message"
-      ) {
-        showToolbar();
-        clearTimeout(mouseTimeout);
-        mouseTimeout = setTimeout(hideToolbar, 5000);
-      }
-    };
-    window.addEventListener("message", (event) => {
-      if (event.data && typeof event.data === "object")
-        handleChatMessage(event.data);
-    });
-
     // Helper function to set active tool in localStorage and notify
     const setActiveTool = (tool: string) => {
       try {
@@ -322,7 +305,7 @@ function initializeExtension() {
       try {
         const el = document.getElementById(id);
         if (el) el.addEventListener("click", cb as any);
-      } catch (_) {}
+      } catch (error) {}
     };
 
     attach("pm-tb-controller", () => setActiveTool("controller-testing"));
@@ -357,7 +340,7 @@ function initializeExtension() {
     attach("pm-tb-qr", () => {
       try {
         chrome.runtime.sendMessage({ action: "openQRScanner" });
-      } catch (_) {}
+      } catch (error) {}
     });
     attach("pm-tb-upc", () => {
       try {
@@ -365,45 +348,13 @@ function initializeExtension() {
           action: "openInSidebar",
           tool: "upc-search",
         });
-      } catch (_) {}
+      } catch (error) {}
     });
     attach("pm-tb-links", () => {
       try {
         chrome.runtime.sendMessage({ action: "openInSidebar", tool: "links" });
-      } catch (_) {}
+      } catch (error) {}
     });
-
-    // Chat button special handling for badge restore
-    try {
-      const chatBtn = document.getElementById("pm-tb-chat");
-      const badge = document.getElementById("pm-chat-badge");
-      if (chatBtn) {
-        const setBadge = (n: number) => {
-          try {
-            if (!badge) return;
-            if (n > 0) {
-              badge.textContent = String(Math.min(99, n));
-              badge.style.display = "inline-block";
-            } else {
-              badge.textContent = "";
-              badge.style.display = "none";
-            }
-          } catch (_) {}
-        };
-        try {
-          chrome.storage?.local?.get({ pmChatUnread: 0 }, (cfg) =>
-            setBadge(Number(cfg?.pmChatUnread || 0))
-          );
-        } catch (_) {}
-        chatBtn.addEventListener("click", () => {
-          setActiveTool("chat");
-          try {
-            chrome.storage?.local?.set({ pmChatUnread: 0 });
-          } catch (_) {}
-          setBadge(0);
-        });
-      }
-    } catch (_) {}
 
     // Close button
     try {
@@ -417,13 +368,13 @@ function initializeExtension() {
             toolbar.classList.add("hidden");
             try {
               localStorage.setItem("paymore-toolbar-closed", "true");
-            } catch (_) {}
+            } catch (error) {}
           } catch (error) {
             console.error("Failed to close toolbar:", error);
           }
         });
       }
-    } catch (_) {}
+    } catch (error) {}
 
     // initial show/hide behavior
     try {
@@ -446,7 +397,7 @@ function initializeExtension() {
           }, 800);
         }
       });
-    } catch (_) {}
+    } catch (error) {}
 
     // Apply user toolbar preferences once the DOM nodes exist
     applyEnabledToolbarTools();
@@ -473,7 +424,7 @@ function initializeExtension() {
       ];
       themes.forEach((t) => toolbarEl.classList.remove(`pm-theme-${t}`));
       toolbarEl.classList.add(`pm-theme-${theme}`);
-    } catch (_) {}
+    } catch (error) {}
   }
 
   function isThisTabActive() {
@@ -482,7 +433,7 @@ function initializeExtension() {
         document.visibilityState === "visible" &&
         (document.hasFocus ? document.hasFocus() : true)
       );
-    } catch (_) {
+    } catch (error) {
       return true;
     }
   }
@@ -678,12 +629,12 @@ function initializeExtension() {
 
         try {
           sendResponse({ ok: true, context });
-        } catch (_) {}
+        } catch (error) {}
       } catch (e) {
         console.error("❌ Error preparing page context:", e);
         try {
           sendResponse({ ok: false, error: e?.message || String(e) });
-        } catch (_) {}
+        } catch (error) {}
       }
       return; // ensure we don't fall-through to the generic responder below
     }
@@ -699,81 +650,13 @@ function initializeExtension() {
       // This is now handled by the background script opening a new tab
       // No local action needed
     }
-    if (message.action === "pm-chat:attention") {
-      try {
-        const container = document.querySelector("#paymore-toolbar .pm-tb");
-        const btn = document.querySelector("#pm-tb-chat");
-        if (btn) {
-          btn.classList.add("pm-attn");
-          setTimeout(() => btn.classList.remove("pm-attn"), 2600);
-        }
-        if (message?.important && container) {
-          container.classList.add("pm-attn");
-          setTimeout(() => container.classList.remove("pm-attn"), 2600);
-        } else if (!message?.hasOwnProperty("important") && container) {
-          // Always show attention for any message (pmChatAttnAll is now always true)
-          container.classList.add("pm-attn");
-          setTimeout(() => container.classList.remove("pm-attn"), 1600);
-        }
-      } catch (_) {}
-      // increment unread on runtime broadcast
-      try {
-        chrome.storage?.local?.get({ pmChatUnread: 0 }, (cfg) => {
-          const next = Math.min(99, Number(cfg?.pmChatUnread || 0) + 1);
-          chrome.storage?.local?.set({ pmChatUnread: next });
-          const badge = document.querySelector("#pm-chat-badge");
-          if (badge) {
-            badge.textContent = String(next);
-            badge.style.display = "inline-block";
-          }
-        });
-      } catch (_) {}
-    } else if (message.action === "scout:scanPOS") {
+    if (message.action === "scout:scanPOS") {
       // Handle Scout POS scanning request
       try {
         const posData = scanPOSWebsite();
         sendResponse({ success: true, ...posData });
       } catch (error) {
         console.error("Error scanning POS website:", error);
-        sendResponse({ success: false, error: error.message });
-      }
-      return true; // Keep message channel open for async response
-    } else if (message.action === "GET_WEBPAGE_CONTEXT") {
-      // Handle webpage context request for AI chat
-      try {
-        const currentUrl = window.location.href;
-        const currentTitle = document.title;
-        const currentDomain = window.location.hostname;
-        const currentPath = window.location.pathname;
-
-        // Extract product information for e-commerce sites
-        let productTitle = "";
-        let listingTitle = "";
-
-        if (
-          currentDomain.includes("amazon.com") ||
-          currentDomain.includes("amazon.ca")
-        ) {
-          productTitle =
-            document.querySelector('h1[id="title"]')?.textContent?.trim() || "";
-        } else if (currentDomain.includes("ebay.com")) {
-          listingTitle =
-            document.querySelector('h1[class*="title"]')?.textContent?.trim() ||
-            "";
-        }
-
-        const contextData = {
-          url: currentUrl,
-          title: currentTitle,
-          domain: currentDomain,
-          path: currentPath,
-          productTitle,
-          listingTitle,
-        };
-
-        sendResponse({ success: true, data: contextData });
-      } catch (error) {
-        console.error("Error getting webpage context:", error);
         sendResponse({ success: false, error: error.message });
       }
       return true; // Keep message channel open for async response
@@ -809,7 +692,7 @@ function initializeExtension() {
     }
     try {
       sendResponse({ ok: true });
-    } catch (_) {}
+    } catch (error) {}
   });
 
   // optional: auto-inject silently; shown on demand
@@ -821,7 +704,7 @@ function initializeExtension() {
         url: location.href,
         excluded: true,
       });
-    } catch (_) {}
+    } catch (error) {}
   } else if (document.readyState === "loading") {
     document.addEventListener(
       "DOMContentLoaded",
@@ -829,7 +712,7 @@ function initializeExtension() {
         injectToolbar();
         try {
           chrome.runtime.sendMessage({ action: "csReady", url: location.href });
-        } catch (_) {}
+        } catch (error) {}
         log("sent csReady");
       },
       { once: true }
@@ -838,7 +721,7 @@ function initializeExtension() {
     injectToolbar();
     try {
       chrome.runtime.sendMessage({ action: "csReady", url: location.href });
-    } catch (_) {}
+    } catch (error) {}
     log("sent csReady");
   }
   // Also listen for clicks inside popup-opened action to confirm
@@ -867,50 +750,7 @@ function initializeExtension() {
           width: Number(data.width) || null,
           height: Number(data.height) || null,
         });
-      } catch (_) {}
-    }
-    // Chat attention broadcast -> light up chat button
-    if (data?.type === "pm-chat:attention") {
-      try {
-        const container = document.querySelector("#paymore-toolbar .pm-tb");
-        const btn = document.querySelector("#pm-tb-chat");
-        // If store filtering is enabled (via data-store attr on toolbar), only light up when matching
-        const toolbarEl = document.getElementById("paymore-toolbar");
-        const selectedStore = toolbarEl?.getAttribute("data-store") || "";
-        const incomingStore = (data?.store || "").toString();
-        if (selectedStore && incomingStore && selectedStore !== incomingStore) {
-          return; // ignore attention for other stores
-        }
-        // Light up chat button always
-        if (btn) {
-          btn.classList.add("pm-attn");
-          setTimeout(() => btn.classList.remove("pm-attn"), 2600);
-        }
-        // If the message is important, also light up entire toolbar (check flag on event)
-        if (data?.important && container) {
-          container.classList.add("pm-attn");
-          setTimeout(() => container.classList.remove("pm-attn"), 2600);
-        } else if (!data?.hasOwnProperty("important")) {
-          // Always show attention for any message (pmChatAttnAll is now always true)
-          if (container) {
-            container.classList.add("pm-attn");
-            setTimeout(() => container.classList.remove("pm-attn"), 1600);
-          }
-        }
-      } catch (_) {}
-      // Do not forward to background here to avoid feedback loops; background is notified directly by chat tool
-      // increment unread count
-      try {
-        chrome.storage?.local?.get({ pmChatUnread: 0 }, (cfg) => {
-          const next = Math.min(99, Number(cfg?.pmChatUnread || 0) + 1);
-          chrome.storage?.local?.set({ pmChatUnread: next });
-          const badge = document.querySelector("#pm-chat-badge");
-          if (badge) {
-            badge.textContent = String(next);
-            badge.style.display = "inline-block";
-          }
-        });
-      } catch (_) {}
+      } catch (error) {}
     }
     if (data?.source === "paymore" && data?.action === "showControllerModal") {
       log("postMessage bridge -> show");
@@ -931,7 +771,7 @@ function initializeExtension() {
       autoShow = cfg?.autoShowModal ?? true;
       log("storage settings", { autoShow });
     });
-  } catch (_) {}
+  } catch (error) {}
 
   let gamepadAccessDenied = false;
 
@@ -941,7 +781,7 @@ function initializeExtension() {
     try {
       const policy = (document as any)?.permissionsPolicy;
       if (policy?.allows) return policy.allows("gamepad");
-    } catch (_) {
+    } catch (error) {
       // Fall through to try older Feature Policy API
     }
 
@@ -953,7 +793,7 @@ function initializeExtension() {
       if (featurePolicy?.features) {
         return featurePolicy.features().includes("gamepad");
       }
-    } catch (_) {
+    } catch (error) {
       // Ignore failures and fall through to assume access is allowed
     }
 
@@ -1007,7 +847,7 @@ function initializeExtension() {
           action: "openInSidebar",
           tool: "controller-testing",
         });
-      } catch (_) {}
+      } catch (error) {}
     }
   });
   window.addEventListener("gamepaddisconnected", (e) => {
@@ -1044,7 +884,7 @@ function initializeExtension() {
           action: "openInSidebar",
           tool: "controller-testing",
         });
-      } catch (_) {}
+      } catch (error) {}
     }
 
     // Only hide if no connection and no activity grace windows
@@ -1456,7 +1296,14 @@ function initializeExtension() {
     TOOLBAR_TOOLS.forEach((tool) => {
       const buttonId = getButtonId(tool.id);
       const button = document.getElementById(buttonId);
-      const target = button?.closest?.(".pm-tb-item") || button;
+      const target = (() => {
+        if (!button) return null;
+        const closest =
+          typeof button.closest === "function"
+            ? (button.closest(".pm-tb-item") as HTMLElement | null)
+            : null;
+        return closest || button;
+      })();
       if (target instanceof HTMLElement) {
         target.style.display = enabledToolbarToolsCache.includes(tool.id)
           ? ""
@@ -1486,7 +1333,7 @@ function initializeExtension() {
           const cleaned = String(imgPath).replace(/^\//, "");
           try {
             imgEl.src = chrome.runtime.getURL(cleaned);
-          } catch (_) {
+          } catch (error) {
             imgEl.src = imgPath;
           }
           // clear and append
@@ -1554,7 +1401,7 @@ function initializeExtension() {
               toolbarEl,
               String(changes.toolbarTheme.newValue || "stone")
             );
-        } catch (_) {}
+        } catch (error) {}
       }
     }
   };

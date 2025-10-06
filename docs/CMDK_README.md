@@ -114,10 +114,6 @@ All toolbar tools are searchable in CMDK. Press Enter to open in the sidebar:
 - QR Scanner
 - UPC Search
 - Quick Links
-- Chat
-
-**Configured in**: [src/lib/tools.ts](src/lib/tools.ts)
-
 ## File Structure
 
 ```
