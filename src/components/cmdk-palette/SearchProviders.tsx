@@ -74,7 +74,7 @@ export const searchProviders: SearchProvider[] = [
     id: "upcitemdb",
     name: "UPCItemDB",
     trigger: ["upc", "upcitemdb", "barcode"],
-    searchUrl: "https://www.upcitemdb.com/search?q={query}",
+    searchUrl: "https://www.upcitemdb.com/upc/{query}",
     icon: Barcode,
     color: "bg-gray-600",
   },
