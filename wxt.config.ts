@@ -20,7 +20,7 @@ export default defineConfig({
   ],
   manifest: {
     name: "Paymore",
-    version: "1.0.8",
+    version: "1.0.9",
     description: "Chrome extension for Paymore Employees.",
     permissions: [
       "storage",
