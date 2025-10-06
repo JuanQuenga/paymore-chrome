@@ -162,14 +162,16 @@ print_header "Verification Checklist"
 echo "Verifying release files..."
 echo ""
 
-# Check version consistency
-WXT_VERSION=$(grep -o 'version: "[^"]*"' wxt.config.ts | cut -d'"' -f2)
-PKG_VERSION=$(grep -o '"version": "[^"]*"' package.json | head -1 | cut -d'"' -f4)
+# Check version consistency using awk (robust to spacing/formatting)
+WXT_VERSION=$(awk -F'"' '/version[[:space:]]*:/ {print $2; exit}' wxt.config.ts || echo "")
+PKG_VERSION=$(awk -F'"' '/\"version\"[[:space:]]*:/ {print $4; exit}' package.json || echo "")
 
 if [ "$WXT_VERSION" == "$NEW_VERSION" ] && [ "$PKG_VERSION" == "$NEW_VERSION" ]; then
     print_success "Version numbers match in wxt.config.ts and package.json"
 else
     print_error "Version mismatch detected!"
+    echo "wxt.config.ts: $WXT_VERSION"
+    echo "package.json: $PKG_VERSION"
     exit 1
 fi
 
@@ -187,9 +189,9 @@ else
     exit 1
 fi
 
-# Check if manifest.json exists in build
+# Check if manifest.json exists in build and extract version robustly
 if [ -f ".output/paymore-chrome/manifest.json" ]; then
-    MANIFEST_VERSION=$(grep -o '"version": "[^"]*"' .output/paymore-chrome/manifest.json | cut -d'"' -f4)
+    MANIFEST_VERSION=$(awk -F'"' '/\"version\"[[:space:]]*:/ {print $4; exit}' .output/paymore-chrome/manifest.json || echo "")
     if [ "$MANIFEST_VERSION" == "$NEW_VERSION" ]; then
         print_success "Manifest version matches: v$MANIFEST_VERSION"
     else
