@@ -4,7 +4,20 @@ Download the latest and previous versions of the Paymore Chrome Extension.
 
 ## Latest Release
 
-### v1.0.9 (Current)
+### v1.0.10 (Current)
+
+**Release Date:** October 06, 2025
+**Download:** [paymore-chrome-v1.0.10.zip](./paymore-chrome-v1.0.10.zip)
+
+**What's New:**
+
+### Bug Fixes
+
+- Fixed UPC Item Database search URL format (from `/search?q={query}` to `/upc/{query}`)
+
+---
+
+### v1.0.9
 
 **Release Date:** October 06, 2025
 **Download:** [paymore-chrome-v1.0.9.zip](./paymore-chrome-v1.0.9.zip)
