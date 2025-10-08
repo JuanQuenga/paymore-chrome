@@ -3,9 +3,10 @@ import { Wrench } from "lucide-react";
 
 interface ToolbarItemProps {
   tool: ToolbarTool;
+  kbdHintAction?: string;
 }
 
-export function ToolbarItem({ tool }: ToolbarItemProps) {
+export function ToolbarItem({ tool, kbdHintAction }: ToolbarItemProps) {
   const IconComponent = tool.reactIcon || Wrench;
 
   return (
@@ -36,6 +37,11 @@ export function ToolbarItem({ tool }: ToolbarItemProps) {
           </p>
         )}
       </div>
+      {kbdHintAction && (
+        <div className="cmdk-item-kbd-hint">
+          <kbd className="cmdk-kbd">↵</kbd>
+        </div>
+      )}
     </div>
   );
 }

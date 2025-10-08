@@ -4,7 +4,39 @@ Download the latest and previous versions of the Paymore Chrome Extension.
 
 ## Latest Release
 
-### v1.0.10 (Current)
+### v1.0.11 (Current)
+
+**Release Date:** October 07, 2025
+**Download:** [paymore-chrome-1.0.11-chrome.zip](./paymore-chrome-1.0.11-chrome.zip)
+
+**What's New:**
+
+### Features
+
+- Version bump and maintenance release
+
+### Improvements
+
+- Updated version numbers across configuration files
+
+### Bug Fixes
+
+- General maintenance and stability improvements
+
+### Installation
+
+1. Download [paymore-chrome-1.0.11-chrome.zip](./paymore-chrome-1.0.11-chrome.zip)
+2. Unzip the file
+3. Open Chrome and navigate to `chrome://extensions/`
+4. Enable "Developer mode" (toggle in top right)
+5. Click "Load unpacked"
+6. Select the unzipped `paymore-chrome` folder
+
+Note: The packed version for Chrome Web Store submission is located at `.output/paymore-chrome-v1.0.11-packed.zip`
+
+---
+
+### v1.0.10
 
 **Release Date:** October 06, 2025
 **Download:** [paymore-chrome-v1.0.10.zip](./paymore-chrome-v1.0.10.zip)
@@ -216,17 +248,17 @@ Note: The packed version for Chrome Web Store submission is located at `.output/
 
 ## Installation Instructions
 
-1. Download `paymore-chrome-v1.0.9.zip`
+1. Download `paymore-chrome-1.0.11-chrome.zip`
 2. Extract the ZIP file to a folder on your computer
 3. Open Chrome and go to `chrome://extensions/`
 4. Enable "Developer mode" in the top right
 5. Click "Load unpacked"
-6. Navigate to the extracted folder and select the `paymore-chrome/` folder
+6. Navigate to the extracted folder and select the `paymore-chrome` folder
 7. The extension will be installed and ready to use
 
 ### For Chrome Web Store Submission
 
-The packed version is located at `.output/paymore-chrome-v1.0.9-packed.zip` and is ready for Chrome Web Store upload via the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole)
+The packed version is located at `.output/paymore-chrome-v1.0.11-packed.zip` and is ready for Chrome Web Store upload via the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole)
 
 ## Keyboard Shortcuts Setup
 
@@ -242,13 +274,15 @@ After installation, you can customize keyboard shortcuts:
 ## Notes
 
 - Always download from official releases to ensure security
-- For the latest features and bug fixes, use the current release (v1.0.9)
+- For the latest features and bug fixes, use the current release (v1.0.11)
 - CMDK requires `bookmarks` and `history` permissions (granted on install)
 - Quick Links are cached for 30 minutes in Chrome storage
-- If you encounter issues, check the [CMDK_README.md](../CMDK_README.md) for troubleshooting
+- If you encounter issues, check the [CMDK_README.md](../docs/CMDK_README.md) for troubleshooting
 
 ## Changelog Summary
 
+**v1.0.11** - Version bump and maintenance release
+**v1.0.10** - Bug fix for UPC Item Database search URL format
 **v1.0.9** - Release script integration, UI improvements, and deployment URL privacy
 **v1.0.8** - Search provider switching, active provider indicators, and toolbar improvements
 **v1.0.7** - Version bump and maintenance release

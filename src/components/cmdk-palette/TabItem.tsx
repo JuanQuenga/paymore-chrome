@@ -3,9 +3,10 @@ import { Globe } from "lucide-react";
 
 interface TabItemProps {
   tab: TabInfo;
+  kbdHintAction?: string;
 }
 
-export function TabItem({ tab }: TabItemProps) {
+export function TabItem({ tab, kbdHintAction }: TabItemProps) {
   const truncateText = (text: string, maxLength: number) => {
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + "...";
@@ -42,6 +43,11 @@ export function TabItem({ tab }: TabItemProps) {
           {truncateText(tab.url || "", 80)}
         </p>
       </div>
+      {kbdHintAction && (
+        <div className="cmdk-item-kbd-hint">
+          <kbd className="cmdk-kbd">↵</kbd>
+        </div>
+      )}
     </div>
   );
 }

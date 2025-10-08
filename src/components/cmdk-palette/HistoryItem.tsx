@@ -3,9 +3,10 @@ import { Clock } from "lucide-react";
 
 interface HistoryItemProps {
   item: HistoryItem;
+  kbdHintAction?: string;
 }
 
-export function HistoryItemComponent({ item }: HistoryItemProps) {
+export function HistoryItemComponent({ item, kbdHintAction }: HistoryItemProps) {
   const truncateText = (text: string, maxLength: number) => {
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + "...";
@@ -24,6 +25,11 @@ export function HistoryItemComponent({ item }: HistoryItemProps) {
           {truncateText(item.url, 80)}
         </p>
       </div>
+      {kbdHintAction && (
+        <div className="cmdk-item-kbd-hint">
+          <kbd className="cmdk-kbd">↵</kbd>
+        </div>
+      )}
     </div>
   );
 }

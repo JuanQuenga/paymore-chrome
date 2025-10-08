@@ -1,7 +1,7 @@
 /* global chrome */
 declare const chrome: any;
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Command } from "cmdk";
 import { TabManager, TabInfo } from "@/src/utils/tab-manager";
 import { fetchCSVLinks, filterCSVLinks, CSVLink } from "@/src/utils/csv-links";
@@ -27,7 +27,7 @@ import { ToolbarItem } from "./ToolbarItem";
 import { BookmarkItem } from "./BookmarkItem";
 import { HistoryItemComponent } from "./HistoryItem";
 import { Skeleton } from "@/src/components/ui/skeleton";
-import { X, Search as SearchIcon } from "lucide-react";
+import { X, Search as SearchIcon, Layers } from "lucide-react";
 import "./styles.css";
 
 interface CMDKPaletteProps {
@@ -51,21 +51,55 @@ export function CMDKPalette({
     null
   );
   const [providerQuery, setProviderQuery] = useState("");
+  const [ebaySuggestions, setEbaySuggestions] = useState<any[]>([]);
+  const [ebayLoading, setEbayLoading] = useState(false);
+  const [copiedEbayId, setCopiedEbayId] = useState<string | null>(null);
   const [userNavigated, setUserNavigated] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  const [enabledSources, setEnabledSources] = useState({
+    tabs: true,
+    bookmarks: true,
+    history: true,
+    quickLinks: true,
+    tools: true,
+    searchProviders: true,
+    ebayCategories: true,
+  });
+  const [sourceOrder, setSourceOrder] = useState<string[]>([
+    "quickLinks",
+    "ebayCategories",
+    "tools",
+    "tabs",
+    "bookmarks",
+    "searchProviders",
+    "history",
+  ]);
   const trimmedSearch = search.trim();
 
   useEffect(() => {
+    // Load settings from chrome storage
+    chrome.storage.sync.get(["cmdkSettings"], (result: any) => {
+      if (result.cmdkSettings?.enabledSources) {
+        setEnabledSources(result.cmdkSettings.enabledSources);
+      }
+      if (result.cmdkSettings?.sourceOrder) {
+        setSourceOrder(result.cmdkSettings.sourceOrder);
+      }
+    });
+  }, []);
+
+  useEffect(() => {
     if (isOpen) {
-      loadTabs();
-      loadCSVLinks();
-      loadBookmarks();
-      loadHistory();
+      if (enabledSources.tabs) loadTabs();
+      if (enabledSources.quickLinks) loadCSVLinks();
+      if (enabledSources.bookmarks) loadBookmarks();
+      if (enabledSources.history) loadHistory();
       setSearch("");
       setActiveProvider(null);
       setProviderQuery("");
       setUserNavigated(false);
     }
-  }, [isOpen]);
+  }, [isOpen, enabledSources]);
 
   const loadTabs = async () => {
     const allTabs = await TabManager.getAllTabs();
@@ -96,6 +130,11 @@ export function CMDKPalette({
 
   const handleValueChange = (value: string) => {
     setSearch(value);
+
+    // Reset scroll position to top when search changes
+    if (listRef.current) {
+      listRef.current.scrollTop = 0;
+    }
 
     // Check if user is typing a provider trigger
     if (!activeProvider) {
@@ -190,6 +229,13 @@ export function CMDKPalette({
         await TabManager.openNewTab(historyItem.url);
         onClose();
       }
+    } else if (value.startsWith("ebay-cat-")) {
+      // Copy category path to clipboard but keep the palette open and show feedback
+      const catId = value.replace("ebay-cat-", "");
+      const suggestion = ebaySuggestions.find((s) => s.categoryId === catId);
+      if (suggestion) {
+        await copyEbayCategory(suggestion.categoryPath, suggestion.categoryId);
+      }
     } else if (value.startsWith("tool-")) {
       const toolId = value.replace("tool-", "");
       const tool = TOOLBAR_TOOLS.find((t) => t.id === toolId);
@@ -257,29 +303,87 @@ export function CMDKPalette({
     }
   };
 
-  const filteredTabs = activeProvider
-    ? []
-    : TabManager.filterTabs(tabs, search);
-  const filteredCSVLinks = activeProvider
-    ? []
-    : filterCSVLinks(csvLinks, search);
-  const filteredBookmarks = activeProvider
-    ? []
-    : filterBookmarks(bookmarks, search);
-  const filteredHistory = activeProvider ? [] : filterHistory(history, search);
+  // Copy helper for ebay categories
+  const copyEbayCategory = async (categoryPath: string, categoryId: string) => {
+    try {
+      await navigator.clipboard.writeText(categoryPath);
+      setCopiedEbayId(categoryId);
+      setTimeout(() => setCopiedEbayId(null), 1500);
+    } catch (err) {
+      console.error("Failed to copy eBay category:", err);
+    }
+  };
+
+  // Fetch eBay suggestions when search changes (not tied to provider)
+  useEffect(() => {
+    if (!enabledSources.ebayCategories) {
+      setEbaySuggestions([]);
+      return;
+    }
+
+    let cancelled = false;
+    const fetchSuggestions = async () => {
+      const q = search.trim();
+      if (q.length < 2) {
+        setEbaySuggestions([]);
+        return;
+      }
+      setEbayLoading(true);
+      try {
+        const res = await fetch(
+          `https://paymore-extension.vercel.app/api/ebay-categories?q=${encodeURIComponent(q)}`
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled) {
+          setEbaySuggestions((data.suggestions || []).slice(0, 1));
+        }
+      } catch (err) {
+        console.error("Failed to fetch eBay suggestions:", err);
+        if (!cancelled) {
+          setEbaySuggestions([]);
+        }
+      } finally {
+        if (!cancelled) setEbayLoading(false);
+      }
+    };
+
+    const t = setTimeout(fetchSuggestions, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [search, enabledSources.ebayCategories]);
+
+  const filteredTabs =
+    activeProvider || !enabledSources.tabs
+      ? []
+      : TabManager.filterTabs(tabs, search);
+  const filteredCSVLinks =
+    activeProvider || !enabledSources.quickLinks
+      ? []
+      : filterCSVLinks(csvLinks, search);
+  const filteredBookmarks =
+    activeProvider || !enabledSources.bookmarks
+      ? []
+      : filterBookmarks(bookmarks, search);
+  const filteredHistory =
+    activeProvider || !enabledSources.history
+      ? []
+      : filterHistory(history, search);
 
   // Filter toolbar tools by search
-  const filteredTools = activeProvider
-    ? []
-    : TOOLBAR_TOOLS.filter((tool) => {
-        if (!trimmedSearch) return true;
-        const lowerQuery = trimmedSearch.toLowerCase();
-        return (
-          tool.label.toLowerCase().includes(lowerQuery) ||
-          tool.description?.toLowerCase().includes(lowerQuery) ||
-          tool.id.toLowerCase().includes(lowerQuery)
-        );
-      });
+  const filteredTools =
+    activeProvider || !enabledSources.tools
+      ? []
+      : TOOLBAR_TOOLS.filter((tool) => {
+          if (!trimmedSearch) return true;
+          const lowerQuery = trimmedSearch.toLowerCase();
+          return (
+            tool.label.toLowerCase().includes(lowerQuery) ||
+            tool.description?.toLowerCase().includes(lowerQuery) ||
+            tool.id.toLowerCase().includes(lowerQuery)
+          );
+        });
 
   const getUrlFromInput = (input: string): string | null => {
     const value = input.trim();
@@ -412,7 +516,7 @@ export function CMDKPalette({
         />
       </div>
 
-      <Command.List className="cmdk-list">
+      <Command.List className="cmdk-list" ref={listRef}>
         <Command.Empty className="cmdk-empty">
           <div className="flex flex-col items-center justify-center py-8 px-4">
             <SearchIcon className="w-12 h-12 text-gray-300 dark:text-gray-600 mb-3" />
@@ -420,9 +524,14 @@ export function CMDKPalette({
               No results found
             </p>
             <p className="text-xs text-gray-400 dark:text-gray-500">
-              {trimmedSearch
-                ? "Press Enter to search Google or open the typed URL."
-                : "Try a different search term"}
+              {trimmedSearch ? (
+                <>
+                  Press <kbd className="cmdk-kbd">Enter</kbd> to search Google
+                  or open the typed URL.
+                </>
+              ) : (
+                "Try a different search term"
+              )}
             </p>
           </div>
         </Command.Empty>
@@ -467,141 +576,245 @@ export function CMDKPalette({
 
         {!activeProvider && (
           <>
-            {/* Quick Links Loading Skeleton */}
-            {csvLinksLoading && (
-              <Command.Group heading="Quick Links" className="cmdk-group">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="cmdk-item px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="w-4 h-4" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-4 w-[200px]" />
-                        <Skeleton className="h-3 w-[150px]" />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </Command.Group>
-            )}
+            {/* Render sources in the order specified by sourceOrder */}
+            {sourceOrder.map((sourceKey) => {
+              switch (sourceKey) {
+                case "quickLinks":
+                  return (
+                    <React.Fragment key="quickLinks">
+                      {/* Quick Links Loading Skeleton */}
+                      {csvLinksLoading && (
+                        <Command.Group heading="Quick Links" className="cmdk-group">
+                          {[1, 2, 3].map((i) => (
+                            <div key={i} className="cmdk-item px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <Skeleton className="w-4 h-4" />
+                                <div className="flex-1 space-y-2">
+                                  <Skeleton className="h-4 w-[200px]" />
+                                  <Skeleton className="h-3 w-[150px]" />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </Command.Group>
+                      )}
 
-            {/* Quick Links - sorted alphabetically by category */}
-            {!csvLinksLoading &&
-              sortedCategories.map((category) => (
-                <Command.Group
-                  key={category}
-                  heading={category}
-                  className="cmdk-group"
-                >
-                  {csvLinksByCategory[category].map((link) => (
-                    <Command.Item
-                      key={link.id}
-                      value={link.id}
-                      onSelect={handleSelect}
-                      className="cmdk-item"
-                    >
-                      <CSVLinkItem link={link} />
-                    </Command.Item>
-                  ))}
-                </Command.Group>
-              ))}
+                      {/* Quick Links - sorted alphabetically by category */}
+                      {!csvLinksLoading &&
+                        sortedCategories.map((category) => (
+                          <Command.Group
+                            key={category}
+                            heading={category}
+                            className="cmdk-group"
+                          >
+                            {csvLinksByCategory[category].map((link) => (
+                              <Command.Item
+                                key={link.id}
+                                value={link.id}
+                                onSelect={handleSelect}
+                                className="cmdk-item"
+                              >
+                                <CSVLinkItem
+                                  link={link}
+                                  kbdHintAction="Open in new tab"
+                                />
+                              </Command.Item>
+                            ))}
+                          </Command.Group>
+                        ))}
+                    </React.Fragment>
+                  );
 
-            {/* Bookmarks */}
-            {filteredBookmarks.length > 0 && (
-              <Command.Group heading="Bookmarks" className="cmdk-group">
-                {filteredBookmarks.map((bookmark) => (
-                  <Command.Item
-                    key={bookmark.id}
-                    value={`bookmark-${bookmark.id}`}
-                    onSelect={handleSelect}
-                    className="cmdk-item"
-                  >
-                    <BookmarkItem bookmark={bookmark} />
-                  </Command.Item>
-                ))}
-              </Command.Group>
-            )}
+                case "ebayCategories":
+                  return (
+                    <React.Fragment key="ebayCategories">
+                      {/* eBay Category Loading */}
+                      {ebayLoading && (
+                        <Command.Group heading="eBay Category" className="cmdk-group">
+                          <div className="cmdk-item px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <Skeleton className="w-8 h-8 rounded" />
+                              <div className="flex-1 space-y-2">
+                                <Skeleton className="h-4 w-[180px]" />
+                                <Skeleton className="h-3 w-[240px]" />
+                              </div>
+                            </div>
+                          </div>
+                        </Command.Group>
+                      )}
 
-            {/* Toolbar Tools */}
-            {filteredTools.length > 0 && (
-              <Command.Group heading="Tools" className="cmdk-group">
-                {filteredTools.map((tool) => (
-                  <Command.Item
-                    key={tool.id}
-                    value={`tool-${tool.id}`}
-                    onSelect={handleSelect}
-                    className="cmdk-item"
-                  >
-                    <ToolbarItem tool={tool} />
-                  </Command.Item>
-                ))}
-              </Command.Group>
-            )}
+                      {/* eBay Category */}
+                      {!ebayLoading && ebaySuggestions.length > 0 && (
+                        <Command.Group heading="eBay Category" className="cmdk-group">
+                          {ebaySuggestions.map((s) => (
+                            <Command.Item
+                              key={s.categoryId}
+                              value={`ebay-cat-${s.categoryId}`}
+                              onSelect={handleSelect}
+                              className="cmdk-item"
+                            >
+                              <div className={`flex items-center gap-3 px-4 py-3 w-full`}>
+                                <div className="p-2 rounded bg-purple-600">
+                                  <Layers className="w-4 h-4 text-white" />
+                                </div>
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    {s.categoryName}
+                                  </p>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    {s.categoryPath}
+                                  </p>
+                                </div>
+                                <div className="cmdk-item-kbd-hint">
+                                  {copiedEbayId === s.categoryId ? (
+                                    <kbd className="cmdk-kbd">Copied</kbd>
+                                  ) : (
+                                    <kbd className="cmdk-kbd">↵</kbd>
+                                  )}
+                                </div>
+                              </div>
+                            </Command.Item>
+                          ))}
+                        </Command.Group>
+                      )}
+                    </React.Fragment>
+                  );
 
-            {/* Tab results */}
-            {filteredTabs.length > 0 && (
-              <Command.Group heading="Tabs" className="cmdk-group">
-                {filteredTabs.map((tab) => (
-                  <Command.Item
-                    key={tab.id}
-                    value={`tab-${tab.id}`}
-                    onSelect={handleSelect}
-                    className="cmdk-item"
-                  >
-                    <TabItem tab={tab} />
-                  </Command.Item>
-                ))}
-              </Command.Group>
-            )}
+                case "bookmarks":
+                  return (
+                    <React.Fragment key="bookmarks">
+                      {/* Bookmarks */}
+                      {filteredBookmarks.length > 0 && (
+                        <Command.Group heading="Bookmarks" className="cmdk-group">
+                          {filteredBookmarks.map((bookmark) => (
+                            <Command.Item
+                              key={bookmark.id}
+                              value={`bookmark-${bookmark.id}`}
+                              onSelect={handleSelect}
+                              className="cmdk-item"
+                            >
+                              <BookmarkItem
+                                bookmark={bookmark}
+                                kbdHintAction="Open in new tab"
+                              />
+                            </Command.Item>
+                          ))}
+                        </Command.Group>
+                      )}
+                    </React.Fragment>
+                  );
 
-            {/* Search providers */}
-            {trimmedSearch && (
-              <Command.Group heading="Search" className="cmdk-group">
-                {searchProviders
-                  .filter((provider) =>
-                    provider.trigger.some((t) =>
-                      t.startsWith(search.toLowerCase())
-                    )
-                  )
-                  .map((provider) => (
-                    <Command.Item
-                      key={provider.id}
-                      value={`provider-${provider.id}`}
-                      onSelect={handleSelect}
-                      className="cmdk-item"
-                    >
-                      <div className="flex items-center gap-3 px-4 py-3">
-                        <div className={`p-2 rounded ${provider.color}`}>
-                          <provider.icon className="w-4 h-4 text-white" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                            Search {provider.name}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Press Tab to activate
-                          </p>
-                        </div>
-                      </div>
-                    </Command.Item>
-                  ))}
-              </Command.Group>
-            )}
+                case "tools":
+                  return (
+                    <React.Fragment key="tools">
+                      {/* Toolbar Tools */}
+                      {filteredTools.length > 0 && (
+                        <Command.Group heading="Tools" className="cmdk-group">
+                          {filteredTools.map((tool) => (
+                            <Command.Item
+                              key={tool.id}
+                              value={`tool-${tool.id}`}
+                              onSelect={handleSelect}
+                              className="cmdk-item"
+                            >
+                              <ToolbarItem tool={tool} kbdHintAction="Open tool" />
+                            </Command.Item>
+                          ))}
+                        </Command.Group>
+                      )}
+                    </React.Fragment>
+                  );
 
-            {/* Recent History */}
-            {filteredHistory.length > 0 && (
-              <Command.Group heading="Recent History" className="cmdk-group">
-                {filteredHistory.map((item) => (
-                  <Command.Item
-                    key={item.id}
-                    value={`history-${item.id}`}
-                    onSelect={handleSelect}
-                    className="cmdk-item"
-                  >
-                    <HistoryItemComponent item={item} />
-                  </Command.Item>
-                ))}
-              </Command.Group>
-            )}
+                case "tabs":
+                  return (
+                    <React.Fragment key="tabs">
+                      {/* Tab results */}
+                      {filteredTabs.length > 0 && (
+                        <Command.Group heading="Tabs" className="cmdk-group">
+                          {filteredTabs.map((tab) => (
+                            <Command.Item
+                              key={tab.id}
+                              value={`tab-${tab.id}`}
+                              onSelect={handleSelect}
+                              className="cmdk-item"
+                            >
+                              <TabItem tab={tab} kbdHintAction="Switch to tab" />
+                            </Command.Item>
+                          ))}
+                        </Command.Group>
+                      )}
+                    </React.Fragment>
+                  );
+
+                case "searchProviders":
+                  return (
+                    <React.Fragment key="searchProviders">
+                      {/* Search providers */}
+                      {trimmedSearch &&
+                        enabledSources.searchProviders && (
+                          <Command.Group heading="Search" className="cmdk-group">
+                            {searchProviders
+                              .filter((provider) =>
+                                provider.trigger.some((t) =>
+                                  t.startsWith(search.toLowerCase())
+                                )
+                              )
+                              .map((provider) => (
+                                <Command.Item
+                                  key={provider.id}
+                                  value={`provider-${provider.id}`}
+                                  onSelect={handleSelect}
+                                  className="cmdk-item"
+                                >
+                                  <div className="flex items-center gap-3 px-4 py-3">
+                                    <div className={`p-2 rounded ${provider.color}`}>
+                                      <provider.icon className="w-4 h-4 text-white" />
+                                    </div>
+                                    <div>
+                                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                        Search {provider.name}
+                                      </p>
+                                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        Press <kbd className="cmdk-kbd">Tab</kbd> to
+                                        activate
+                                      </p>
+                                    </div>
+                                  </div>
+                                </Command.Item>
+                              ))}
+                          </Command.Group>
+                        )}
+                    </React.Fragment>
+                  );
+
+                case "history":
+                  return (
+                    <React.Fragment key="history">
+                      {/* Recent History */}
+                      {filteredHistory.length > 0 && (
+                        <Command.Group heading="Recent History" className="cmdk-group">
+                          {filteredHistory.map((item) => (
+                            <Command.Item
+                              key={item.id}
+                              value={`history-${item.id}`}
+                              onSelect={handleSelect}
+                              className="cmdk-item"
+                            >
+                              <HistoryItemComponent
+                                item={item}
+                                kbdHintAction="Open in new tab"
+                              />
+                            </Command.Item>
+                          ))}
+                        </Command.Group>
+                      )}
+                    </React.Fragment>
+                  );
+
+                default:
+                  return null;
+              }
+            })}
           </>
         )}
       </Command.List>

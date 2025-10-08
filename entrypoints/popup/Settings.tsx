@@ -11,9 +11,50 @@ import {
 import { Checkbox } from "../../src/components/ui/checkbox";
 import { Toggle } from "../../src/components/ui/toggle";
 import { Switch } from "../../src/components/ui/switch";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "../../src/components/ui/accordion";
+import { Menu } from "lucide-react";
 import { TOOLBAR_TOOLS } from "../../src/lib/tools";
 /* global chrome */
 declare const chrome: any;
+
+interface CMDKSettings {
+  enabledSources: {
+    tabs: boolean;
+    bookmarks: boolean;
+    history: boolean;
+    quickLinks: boolean;
+    tools: boolean;
+    searchProviders: boolean;
+    ebayCategories: boolean;
+  };
+  sourceOrder: string[];
+}
+
+const DEFAULT_CMDK_SETTINGS: CMDKSettings = {
+  enabledSources: {
+    tabs: true,
+    bookmarks: true,
+    history: true,
+    quickLinks: true,
+    tools: true,
+    searchProviders: true,
+    ebayCategories: true,
+  },
+  sourceOrder: [
+    "quickLinks",
+    "ebayCategories",
+    "tools",
+    "tabs",
+    "bookmarks",
+    "searchProviders",
+    "history",
+  ],
+};
 
 export function Settings() {
   const HOSTED_URL = "https://paymore-extension.vercel.app";
@@ -22,8 +63,8 @@ export function Settings() {
   const [scannerBaseUrl, setScannerBaseUrl] = useState(HOSTED_URL);
   const [enabledTools, setEnabledTools] = useState<string[]>([]);
   const [toolbarTheme, setToolbarTheme] = useState<string>("stone");
-  const [saved, setSaved] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [cmdkSettings, setCmdkSettings] = useState<CMDKSettings>(DEFAULT_CMDK_SETTINGS);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     // Load settings from chrome.storage or fallback to localStorage
@@ -60,6 +101,13 @@ export function Settings() {
         setToolbarTheme(String(theme));
       }
     );
+
+    // Load CMDK settings from chrome.storage.sync
+    chrome.storage.sync.get(["cmdkSettings"], (result: any) => {
+      if (result.cmdkSettings) {
+        setCmdkSettings(result.cmdkSettings);
+      }
+    });
   }, []);
 
   const persistSettings = (
@@ -83,17 +131,16 @@ export function Settings() {
     } catch (error) {}
   };
 
-  const handleSave = () => {
-    setSaving(true);
-    try {
-      persistSettings(enabledTools, scannerBaseUrl);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch (e) {
-      console.error("Failed to save settings:", e);
-    } finally {
-      setSaving(false);
-    }
+  const handleResetToolbar = () => {
+    const defaults = TOOLBAR_TOOLS.map((t) => t.id);
+    setEnabledTools(defaults);
+    setToolbarTheme("stone");
+    persistSettings(defaults, undefined, "stone");
+  };
+
+  const handleResetDeployment = () => {
+    setScannerBaseUrl(HOSTED_URL);
+    persistSettings(enabledTools, HOSTED_URL);
   };
 
   const toggleTool = (toolId: string) => {
@@ -106,21 +153,181 @@ export function Settings() {
     });
   };
 
+  const handleToggleSource = (source: keyof CMDKSettings["enabledSources"]) => {
+    const newSettings = {
+      ...cmdkSettings,
+      enabledSources: {
+        ...cmdkSettings.enabledSources,
+        [source]: !cmdkSettings.enabledSources[source],
+      },
+    };
+    setCmdkSettings(newSettings);
+    chrome.storage.sync.set({ cmdkSettings: newSettings });
+  };
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    const newOrder = [...cmdkSettings.sourceOrder];
+    const draggedItem = newOrder[draggedIndex];
+    newOrder.splice(draggedIndex, 1);
+    newOrder.splice(index, 0, draggedItem);
+
+    const newSettings = {
+      ...cmdkSettings,
+      sourceOrder: newOrder,
+    };
+    setCmdkSettings(newSettings);
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    chrome.storage.sync.set({ cmdkSettings: cmdkSettings });
+  };
+
+  const handleResetCMDK = () => {
+    setCmdkSettings(DEFAULT_CMDK_SETTINGS);
+    chrome.storage.sync.set({ cmdkSettings: DEFAULT_CMDK_SETTINGS });
+  };
+
+  const sourcesConfig = {
+    tabs: {
+      key: "tabs" as const,
+      label: "Tabs",
+      description: "Search and switch between open browser tabs",
+    },
+    bookmarks: {
+      key: "bookmarks" as const,
+      label: "Bookmarks",
+      description: "Access your saved bookmarks",
+    },
+    history: {
+      key: "history" as const,
+      label: "Recent History",
+      description: "View recently visited pages",
+    },
+    quickLinks: {
+      key: "quickLinks" as const,
+      label: "Quick Links",
+      description: "CSV-based custom links organized by category",
+    },
+    tools: {
+      key: "tools" as const,
+      label: "Tools",
+      description: "PayMore extension tools and features",
+    },
+    searchProviders: {
+      key: "searchProviders" as const,
+      label: "Search Providers",
+      description: "Google, YouTube, Amazon, and other search engines",
+    },
+    ebayCategories: {
+      key: "ebayCategories" as const,
+      label: "eBay Categories",
+      description: "Live eBay category suggestions as you type",
+    },
+  };
+
   const usingLocalhost = /localhost(:\d+)?$/.test(
     String(scannerBaseUrl).replace(/https?:\/\//, "")
   );
+
+  const sources = cmdkSettings.sourceOrder
+    .map((key) => sourcesConfig[key as keyof typeof sourcesConfig])
+    .filter(Boolean);
 
   // no local icon map — icons come from TOOLBAR_TOOLS.reactIcon or TOOLBAR_TOOLS.svg
 
   return (
     <div className="p-2 space-y-6 pm-scroll">
-      <Card className="border-stone-200">
-        <CardHeader>
-          <CardTitle className="mb-2">Toolbar Tools</CardTitle>
-          Select the tools you want to see in the toolbar.
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-2">
+      <Accordion type="multiple" defaultValue={["cmdk"]} className="space-y-4">
+        <AccordionItem value="cmdk" className="border-none">
+          <Card className="border-stone-200">
+            <CardHeader>
+              <AccordionTrigger className="hover:no-underline">
+                <div>
+                  <CardTitle className="mb-2">Command Menu Sources</CardTitle>
+                  <p className="text-sm text-muted-foreground font-normal">
+                    Configure sources and order for the command menu popup.
+                  </p>
+                </div>
+              </AccordionTrigger>
+            </CardHeader>
+            <AccordionContent>
+              <CardContent className="pt-0">
+                <div className="space-y-2">
+                  {sources.map((source, index) => (
+                    <div
+                      key={source.key}
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDragEnd={handleDragEnd}
+                      className={`p-3 flex items-start gap-3 border border-stone-200 rounded-md hover:bg-stone-50 transition-colors cursor-move ${
+                        draggedIndex === index ? "opacity-50" : ""
+                      }`}
+                    >
+                      <button
+                        className="p-1 text-stone-400 hover:text-stone-600 cursor-grab active:cursor-grabbing"
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        <Menu className="w-4 h-4" />
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-medium text-sm">{source.label}</h3>
+                          {cmdkSettings.enabledSources[source.key] && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-stone-600">
+                          {source.description}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={cmdkSettings.enabledSources[source.key]}
+                        onCheckedChange={() => handleToggleSource(source.key)}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 pt-4 border-t border-stone-200">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResetCMDK}
+                  >
+                    Reset to Defaults
+                  </Button>
+                </div>
+              </CardContent>
+            </AccordionContent>
+          </Card>
+        </AccordionItem>
+
+        <AccordionItem value="toolbar" className="border-none">
+          <Card className="border-stone-200">
+            <CardHeader>
+              <AccordionTrigger className="hover:no-underline">
+                <div>
+                  <CardTitle className="mb-2">Toolbar Tools</CardTitle>
+                  <p className="text-sm text-muted-foreground font-normal">
+                    Select the tools you want to see in the toolbar.
+                  </p>
+                </div>
+              </AccordionTrigger>
+            </CardHeader>
+            <AccordionContent>
+              <CardContent className="pt-0">
+                <div className="grid grid-cols-3 gap-2">
             {TOOLBAR_TOOLS.map((tool) => {
               const active = enabledTools.includes(tool.id);
               // render icon: prefer reactIcon (Lucide component), then raw svg markup, then image
@@ -209,21 +416,45 @@ export function Settings() {
               Affects the floating toolbar colors on web pages.
             </div>
           </div>
-        </CardContent>
-      </Card>
+          <div className="mt-4 pt-4 border-t border-stone-200">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResetToolbar}
+            >
+              Reset to Defaults
+            </Button>
+          </div>
+              </CardContent>
+            </AccordionContent>
+          </Card>
+        </AccordionItem>
 
-      <Card className="border-stone-200">
-        <CardHeader>
-          <CardTitle>Deployment</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+        <AccordionItem value="deployment" className="border-none">
+          <Card className="border-stone-200">
+            <CardHeader>
+              <AccordionTrigger className="hover:no-underline">
+                <div>
+                  <CardTitle className="mb-2">Deployment</CardTitle>
+                  <p className="text-sm text-muted-foreground font-normal">
+                    Configure the deployment URL for hosted tools.
+                  </p>
+                </div>
+              </AccordionTrigger>
+            </CardHeader>
+            <AccordionContent>
+              <CardContent className="space-y-3 pt-0">
           <div className="grid grid-cols-1 gap-2">
             <Label htmlFor="scanner-url">Deployment URL</Label>
             <Input
               id="scanner-url"
               type="url"
               value={scannerBaseUrl}
-              onChange={(e) => setScannerBaseUrl(e.target.value)}
+              onChange={(e) => {
+                const newUrl = e.target.value;
+                setScannerBaseUrl(newUrl);
+                persistSettings(enabledTools, newUrl);
+              }}
             />
             <div className="text-xs text-muted-foreground">
               Used by popup and hosted tools.
@@ -238,30 +469,27 @@ export function Settings() {
             </div>
             <Switch
               checked={usingLocalhost}
-              onCheckedChange={(checked) =>
-                setScannerBaseUrl(checked ? LOCAL_URL : HOSTED_URL)
-              }
+              onCheckedChange={(checked) => {
+                const newUrl = checked ? LOCAL_URL : HOSTED_URL;
+                setScannerBaseUrl(newUrl);
+                persistSettings(enabledTools, newUrl);
+              }}
             />
           </div>
-        </CardContent>
-      </Card>
-
-      <div className="flex gap-3">
-        <Button className="flex-1" onClick={handleSave} disabled={saving}>
-          {saved ? "Saved!" : saving ? "Saving..." : "Save Settings"}
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => {
-            const defaults = TOOLBAR_TOOLS.map((t) => t.id);
-            setEnabledTools(defaults);
-            setToolbarTheme("stone");
-            persistSettings(defaults, undefined, "stone");
-          }}
-        >
-          Reset
-        </Button>
-      </div>
+          <div className="mt-4 pt-4 border-t border-stone-200">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResetDeployment}
+            >
+              Reset to Defaults
+            </Button>
+          </div>
+              </CardContent>
+            </AccordionContent>
+          </Card>
+        </AccordionItem>
+      </Accordion>
     </div>
   );
 }

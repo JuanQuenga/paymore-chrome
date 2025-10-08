@@ -205,3 +205,84 @@
 .cmdk-fullscreen .cmdk-list {
   max-height: calc(100vh - 60px);
 }
+
+/* Keyboard hint */
+.cmdk-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background-color: rgba(148, 163, 184, 0.15);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  color: #334155;
+  box-shadow: inset 0 -1px 0 rgba(148, 163, 184, 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  .cmdk-kbd {
+    border-color: rgba(148, 163, 184, 0.4);
+    background-color: rgba(148, 163, 184, 0.25);
+    color: #e2e8f0;
+    box-shadow: inset 0 -1px 0 rgba(15, 23, 42, 0.6);
+  }
+}
+
+.cmdk-input-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0;
+  pointer-events: none;
+  color: #6b7280;
+}
+
+.cmdk-input-overlay-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cmdk-input-overlay-hint {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: inherit;
+  white-space: nowrap;
+}
+
+@media (prefers-color-scheme: dark) {
+  .cmdk-input-overlay {
+    color: #9ca3af;
+  }
+
+  .cmdk-input-overlay-title {
+    color: #f3f4f6;
+  }
+}
+
+/* Keyboard hint for selected items */
+.cmdk-item-kbd-hint {
+  display: none;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.cmdk-item[data-selected="true"] .cmdk-item-kbd-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}

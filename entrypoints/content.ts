@@ -834,28 +834,21 @@ function initializeExtension() {
   }
 
   let lastControllerPopupAt = 0;
+  let hasAutoOpenedOnce = false; // Track if we've already auto-opened for this session
+
   window.addEventListener("gamepadconnected", (e) => {
     log("gamepadconnected", { id: e.gamepad?.id, index: e.gamepad?.index });
     lastConnected = Date.now();
     userDismissed = false; // new connection lifts manual dismissal
-    // Open hosted Controller Test instead of legacy modal
-    const now = Date.now();
-    if (isThisTabActive() && now - lastControllerPopupAt > 5000) {
-      lastControllerPopupAt = now;
-      try {
-        chrome.runtime.sendMessage({
-          action: "openInSidebar",
-          tool: "controller-testing",
-        });
-      } catch (error) {}
-    }
+    hasAutoOpenedOnce = false; // Reset on new connection to allow auto-open
   });
+
   window.addEventListener("gamepaddisconnected", (e) => {
     log("gamepaddisconnected", { id: e.gamepad?.id, index: e.gamepad?.index });
     // don't immediately hide; polling loop applies grace period
   });
 
-  // Light polling to detect activity and auto-open
+  // Light polling to detect first activity and auto-open once
   setInterval(() => {
     const now = Date.now();
     const active = anyGamepadActive();
@@ -867,18 +860,17 @@ function initializeExtension() {
     const recentlyActive = now - lastActive < 1000; // 1s grace
     const recentlyConnected = now - lastConnected < 1500; // 1.5s grace
 
-    // Reopen rules:
-    // - If never manually dismissed, show on connected/recent activity as before
-    // - If manually dismissed, only reopen on fresh activity after dismissal
-    const shouldReopenAfterDismiss =
-      userDismissed && (lastActive > lastDismissedAt || recentlyConnected);
+    // Only auto-open once when controller becomes active
+    // Don't repeatedly open the sidepanel
     const shouldAutoOpen =
       isThisTabActive() &&
-      (connected || recentlyActive || recentlyConnected) &&
-      (!userDismissed || shouldReopenAfterDismiss);
-    // Auto-open the hosted Controller Testing in the sidebar on fresh activity/connection
+      !hasAutoOpenedOnce &&
+      (recentlyActive || recentlyConnected) &&
+      !userDismissed;
+
     if (autoShow && shouldAutoOpen && now - lastControllerPopupAt > 5000) {
       lastControllerPopupAt = now;
+      hasAutoOpenedOnce = true; // Mark that we've auto-opened
       try {
         chrome.runtime.sendMessage({
           action: "openInSidebar",
@@ -886,9 +878,6 @@ function initializeExtension() {
         });
       } catch (error) {}
     }
-
-    // Only hide if no connection and no activity grace windows
-    // No-op
   }, 250);
 
   // Hide when tab loses visibility/focus to keep it scoped to active tab

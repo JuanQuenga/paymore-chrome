@@ -3,9 +3,10 @@ import { ExternalLink, Folder } from "lucide-react";
 
 interface CSVLinkItemProps {
   link: CSVLink;
+  kbdHintAction?: string;
 }
 
-export function CSVLinkItem({ link }: CSVLinkItemProps) {
+export function CSVLinkItem({ link, kbdHintAction }: CSVLinkItemProps) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 w-full">
       <div className="flex-shrink-0 w-4 h-4">
@@ -28,6 +29,11 @@ export function CSVLinkItem({ link }: CSVLinkItemProps) {
           {link.url}
         </p>
       </div>
+      {kbdHintAction && (
+        <div className="cmdk-item-kbd-hint">
+          <kbd className="cmdk-kbd">↵</kbd>
+        </div>
+      )}
     </div>
   );
 }

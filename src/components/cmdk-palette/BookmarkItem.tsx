@@ -3,9 +3,10 @@ import { Bookmark as BookmarkIcon } from "lucide-react";
 
 interface BookmarkItemProps {
   bookmark: Bookmark;
+  kbdHintAction?: string;
 }
 
-export function BookmarkItem({ bookmark }: BookmarkItemProps) {
+export function BookmarkItem({ bookmark, kbdHintAction }: BookmarkItemProps) {
   const truncateText = (text: string, maxLength: number) => {
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + "...";
@@ -24,6 +25,11 @@ export function BookmarkItem({ bookmark }: BookmarkItemProps) {
           {truncateText(bookmark.url, 80)}
         </p>
       </div>
+      {kbdHintAction && (
+        <div className="cmdk-item-kbd-hint">
+          <kbd className="cmdk-kbd">↵</kbd>
+        </div>
+      )}
     </div>
   );
 }
