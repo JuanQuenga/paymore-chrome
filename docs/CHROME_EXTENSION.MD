@@ -4,9 +4,41 @@ The Paymore Chrome Extension is a lightweight tool designed specifically for Pay
 
 ## What's New (Since v1.0.4)
 
+### v1.0.13 - Even More Search Options
+
+Right-click on any product number and you'll now see a new option:
+
+- **MPN Google Search** - Instantly search for Manufacturer Part Numbers on Google to find product details and pricing
+
+### v1.0.12 - Smarter Searching & Faster Loading
+
+We've added powerful new right-click search options and made everything load faster:
+
+- **Three new right-click searches** - Select any product code and right-click to instantly search:
+  - UPCItemDB for detailed product information
+  - Google for UPC codes
+  - PriceCharting for market pricing
+- **Faster Quick Links** - Your favorite links now load instantly even when the cache is updating in the background
+- **Cleaner right-click menu** - Simplified menu text makes it easier to find what you need
+
+### v1.0.11 - Maintenance & Updates
+
+Behind-the-scenes improvements to keep everything running smoothly and reliably.
+
+### v1.0.10 - UPC Database Fix
+
+Fixed an issue with UPC database searches so they work correctly every time.
+
+### v1.0.9 - Smoother Experience
+
+We've polished the interface and made everything feel more responsive:
+
+- **Better popup layout** - The extension popup now uses all available space for easier navigation
+- **Streamlined release process** - Faster updates mean you get new features and fixes quicker
+
 ### v1.0.8 - Better Search & Navigation
 
-We've it even easier to find what you need quickly:
+We've made it even easier to find what you need quickly:
 
 - **Switch search providers on the fly** - When you're in the command menu, you can now see and switch between different search engines (like switching from Google to eBay mid-search)
 - **Visual search indicators** - Active search providers now show a green badge so you know exactly what you're searching with
@@ -49,7 +81,12 @@ Toolbar tools:
 
 Context menu:
 
-- Right-click a product title or image and choose **Paymore Lookup** to instantly check price, view details, or add the item to inventory.
+- Right-click any selected text and instantly search:
+  - **eBay Sold Listings** — view completed sales for pricing research
+  - **UPCItemDB** — lookup UPC codes for product details
+  - **Google UPC Search** — search Google for UPC information
+  - **Google MPN Search** — search Google for Manufacturer Part Numbers
+  - **PriceCharting** — check current market prices and trends
 
 Get started:
 

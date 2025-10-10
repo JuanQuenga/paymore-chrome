@@ -4,7 +4,26 @@ Download the latest and previous versions of the Paymore Chrome Extension.
 
 ## Latest Release
 
-### v1.0.12 (Current)
+### v1.0.13 (Current)
+
+**Release Date:** October 10, 2025
+**Download:** [paymore-1.0.13-chrome.zip](./paymore-1.0.13-chrome.zip)
+
+**What's New:**
+
+### Features
+
+- **New Context Menu Action**: Added "Search for MPN on Google" to right-click search options
+
+### Improvements
+
+- Expanded context menu search capabilities with MPN (Manufacturer Part Number) lookup
+
+---
+
+## Previous Releases
+
+### v1.0.12
 
 **Release Date:** October 10, 2025
 **Download:** [paymore-1.0.12-chrome.zip](./paymore-1.0.12-chrome.zip)
@@ -30,18 +49,7 @@ Download the latest and previous versions of the Paymore Chrome Extension.
 
 - Fixed cache expiration logic to prevent unnecessary loading states when cached data is available
 
-### Installation
-
-1. Download [paymore-1.0.12-chrome.zip](./paymore-1.0.12-chrome.zip)
-2. Unzip the file
-3. Open Chrome and navigate to `chrome://extensions/`
-4. Enable "Developer mode" (toggle in top right)
-5. Click "Load unpacked"
-6. Select the unzipped `paymore` folder
-
 ---
-
-## Previous Releases
 
 ### v1.0.11
 
@@ -270,7 +278,7 @@ Download the latest and previous versions of the Paymore Chrome Extension.
 
 ## Installation Instructions
 
-1. Download `paymore-1.0.12-chrome.zip`
+1. Download `paymore-1.0.13-chrome.zip`
 2. Extract the ZIP file to a folder on your computer
 3. Open Chrome and go to `chrome://extensions/`
 4. Enable "Developer mode" in the top right
@@ -296,13 +304,14 @@ After installation, you can customize keyboard shortcuts:
 ## Notes
 
 - Always download from official releases to ensure security
-- For the latest features and bug fixes, use the current release (v1.0.12)
+- For the latest features and bug fixes, use the current release (v1.0.13)
 - CMDK requires `bookmarks` and `history` permissions (granted on install)
 - Quick Links are cached for 30 minutes in Chrome storage
 - If you encounter issues, check the [CMDK_README.md](../docs/CMDK_README.md) for troubleshooting
 
 ## Changelog Summary
 
+**v1.0.13** - Added MPN search context menu action
 **v1.0.12** - Enhanced context menu options, smarter CSV caching, package name simplification
 **v1.0.11** - Version bump and maintenance release
 **v1.0.10** - Bug fix for UPC Item Database search URL format
