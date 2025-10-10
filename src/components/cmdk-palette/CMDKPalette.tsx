@@ -108,11 +108,11 @@ export function CMDKPalette({
   };
 
   const loadCSVLinks = async () => {
-    // Only show loading if we don't have any links yet
-    if (csvLinks.length === 0) {
+    const { links, isInitialLoad } = await fetchCSVLinks();
+    // Only show loading skeleton on initial load (when no cache exists)
+    if (isInitialLoad) {
       setCSVLinksLoading(true);
     }
-    const links = await fetchCSVLinks();
     setCSVLinks(links);
     setCSVLinksLoading(false);
   };

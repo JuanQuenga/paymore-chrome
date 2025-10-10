@@ -103,37 +103,43 @@ const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
 
 /**
  * Fetch CSV links from Google Sheets with caching
+ * Returns an object with links and a flag indicating if this is initial load
  */
-export async function fetchCSVLinks(): Promise<CSVLink[]> {
+export async function fetchCSVLinks(): Promise<{ links: CSVLink[]; isInitialLoad: boolean }> {
   try {
     // Try to get cached data first
-    const cached = await getCachedLinks();
-    if (cached) {
-      console.log("[CSV] Using cached links:", cached.length);
-      // Return cached data immediately, but refresh in background
-      refreshLinksInBackground();
-      return cached;
+    const result = await getCachedLinks();
+    if (result.cached) {
+      console.log("[CSV] Using cached links:", result.cached.length);
+      // Return cached data immediately, but refresh in background if expired
+      if (result.isExpired) {
+        console.log("[CSV] Cache expired, refreshing in background");
+        refreshLinksInBackground();
+      }
+      return { links: result.cached, isInitialLoad: false };
     }
 
-    // No cache, fetch fresh data
+    // No cache, fetch fresh data - this is initial load
     console.log("[CSV] No cache found, fetching fresh data");
-    return await fetchFreshLinks();
+    const links = await fetchFreshLinks();
+    return { links, isInitialLoad: true };
   } catch (error) {
     console.error("[CSV] Failed to fetch CSV links:", error);
-    return [];
+    return { links: [], isInitialLoad: false };
   }
 }
 
 /**
- * Get cached links if they exist and are not expired
+ * Get cached links if they exist
+ * Returns cached links and whether they are expired
  */
-async function getCachedLinks(): Promise<CSVLink[] | null> {
+async function getCachedLinks(): Promise<{ cached: CSVLink[] | null; isExpired: boolean }> {
   return new Promise((resolve) => {
     chrome.storage.local.get(
       [CACHE_KEY, CACHE_TIMESTAMP_KEY],
       (result) => {
         if (chrome.runtime.lastError) {
-          resolve(null);
+          resolve({ cached: null, isExpired: false });
           return;
         }
 
@@ -141,7 +147,7 @@ async function getCachedLinks(): Promise<CSVLink[] | null> {
         const timestamp = result[CACHE_TIMESTAMP_KEY];
 
         if (!cachedLinks || !timestamp) {
-          resolve(null);
+          resolve({ cached: null, isExpired: false });
           return;
         }
 
@@ -150,12 +156,13 @@ async function getCachedLinks(): Promise<CSVLink[] | null> {
         const age = now - timestamp;
 
         if (age > CACHE_DURATION) {
-          console.log("[CSV] Cache expired");
-          resolve(null);
+          console.log("[CSV] Cache expired, but returning cached data");
+          // Return cached data but mark as expired so it refreshes in background
+          resolve({ cached: cachedLinks, isExpired: true });
           return;
         }
 
-        resolve(cachedLinks);
+        resolve({ cached: cachedLinks, isExpired: false });
       }
     );
   });

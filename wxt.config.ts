@@ -6,8 +6,8 @@ export default defineConfig({
   modules: ["@wxt-dev/module-react"],
   // Use the official Tailwind v4 Vite plugin for class scanning + HMR.
   vite: () => ({ plugins: [tailwindcss()] } as WxtViteConfig),
-  outDir: "releases", // Output to releases folder
-  outDirTemplate: "paymore-chrome", // Custom output directory name (removes browser/manifest folder nesting)
+  outDir: ".output", // Base output directory
+  outDirTemplate: "paymore", // Custom output directory name (removes browser/manifest folder nesting)
   contentScripts: [
     {
       matches: ["<all_urls>"],
@@ -20,7 +20,7 @@ export default defineConfig({
   ],
   manifest: {
     name: "Paymore",
-    version: "1.0.11",
+    version: "1.0.12",
     description: "Chrome extension for Paymore Employees.",
     permissions: [
       "storage",

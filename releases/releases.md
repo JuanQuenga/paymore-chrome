@@ -4,10 +4,49 @@ Download the latest and previous versions of the Paymore Chrome Extension.
 
 ## Latest Release
 
-### v1.0.11 (Current)
+### v1.0.12 (Current)
+
+**Release Date:** October 10, 2025
+**Download:** [paymore-1.0.12-chrome.zip](./paymore-1.0.12-chrome.zip)
+
+**What's New:**
+
+### Features
+
+- **Enhanced Context Menu Options**: Added three new right-click search options for selected text:
+  - Search on UPCItemDB
+  - Search for UPC on Google
+  - Search on PriceCharting
+- **Package Name Simplification**: Renamed package from "paymore-chrome" to "paymore"
+
+### Improvements
+
+- **Smarter CSV Caching**: Quick Links now return cached data immediately even if expired, then refresh in background for seamless UX
+- **Improved Loading States**: Loading skeleton only shows on true initial load (no cache), not on cache refresh
+- **Build Output Restructure**: Build outputs to `.output/` directory, zip files automatically moved to `releases/` folder
+- **Cleaner Context Menu Titles**: Simplified right-click menu item labels for better readability
+
+### Bug Fixes
+
+- Fixed cache expiration logic to prevent unnecessary loading states when cached data is available
+
+### Installation
+
+1. Download [paymore-1.0.12-chrome.zip](./paymore-1.0.12-chrome.zip)
+2. Unzip the file
+3. Open Chrome and navigate to `chrome://extensions/`
+4. Enable "Developer mode" (toggle in top right)
+5. Click "Load unpacked"
+6. Select the unzipped `paymore` folder
+
+---
+
+## Previous Releases
+
+### v1.0.11
 
 **Release Date:** October 07, 2025
-**Download:** [paymore-chrome-1.0.11-chrome.zip](./paymore-chrome-1.0.11-chrome.zip)
+**Download:** [paymore-1.0.11-chrome.zip](./paymore-1.0.11-chrome.zip)
 
 **What's New:**
 
@@ -23,23 +62,12 @@ Download the latest and previous versions of the Paymore Chrome Extension.
 
 - General maintenance and stability improvements
 
-### Installation
-
-1. Download [paymore-chrome-1.0.11-chrome.zip](./paymore-chrome-1.0.11-chrome.zip)
-2. Unzip the file
-3. Open Chrome and navigate to `chrome://extensions/`
-4. Enable "Developer mode" (toggle in top right)
-5. Click "Load unpacked"
-6. Select the unzipped `paymore-chrome` folder
-
-Note: The packed version for Chrome Web Store submission is located at `.output/paymore-chrome-v1.0.11-packed.zip`
-
 ---
 
 ### v1.0.10
 
 **Release Date:** October 06, 2025
-**Download:** [paymore-chrome-v1.0.10.zip](./paymore-chrome-v1.0.10.zip)
+**Download:** [paymore-1.0.10-chrome.zip](./paymore-1.0.10-chrome.zip)
 
 **What's New:**
 
@@ -52,7 +80,7 @@ Note: The packed version for Chrome Web Store submission is located at `.output/
 ### v1.0.9
 
 **Release Date:** October 06, 2025
-**Download:** [paymore-chrome-v1.0.9.zip](./paymore-chrome-v1.0.9.zip)
+**Download:** [paymore-1.0.9-chrome.zip](./paymore-1.0.9-chrome.zip)
 
 **What's New:**
 
@@ -78,14 +106,12 @@ Note: The packed version for Chrome Web Store submission is located at `.output/
 
 ### Installation
 
-1. Download [paymore-chrome-v1.0.9.zip](./paymore-chrome-v1.0.9.zip)
+1. Download [paymore-1.0.9-chrome.zip](./paymore-1.0.9-chrome.zip)
 2. Unzip the file
 3. Open Chrome and navigate to `chrome://extensions/`
 4. Enable "Developer mode" (toggle in top right)
 5. Click "Load unpacked"
-6. Select the unzipped `paymore-chrome` folder
-
-Note: The packed version for Chrome Web Store submission is located at `.output/paymore-chrome-v1.0.9-packed.zip`
+6. Select the unzipped `paymore` folder
 
 ---
 
@@ -94,7 +120,7 @@ Note: The packed version for Chrome Web Store submission is located at `.output/
 ### v1.0.8
 
 **Release Date:** October 04, 2025
-**Download:** [paymore-chrome-v1.0.8.zip](./paymore-chrome-v1.0.8.zip)
+**Download:** [paymore-1.0.8-chrome.zip](./paymore-1.0.8-chrome.zip)
 
 **What's New:**
 
@@ -120,14 +146,12 @@ Note: The packed version for Chrome Web Store submission is located at `.output/
 
 ### Installation
 
-1. Download [paymore-chrome-v1.0.8.zip](./paymore-chrome-v1.0.8.zip)
+1. Download [paymore-1.0.8-chrome.zip](./paymore-1.0.8-chrome.zip)
 2. Unzip the file
 3. Open Chrome and navigate to `chrome://extensions/`
 4. Enable "Developer mode" (toggle in top right)
 5. Click "Load unpacked"
-6. Select the unzipped `paymore-chrome` folder
-
-Note: The packed version for Chrome Web Store submission is located at `.output/paymore-chrome-v1.0.8-packed.zip`
+6. Select the unzipped `paymore` folder
 
 ---
 
@@ -136,7 +160,7 @@ Note: The packed version for Chrome Web Store submission is located at `.output/
 ### v1.0.7
 
 **Release Date:** October 04, 2025
-**Download:** [paymore-chrome-v1.0.7.zip](./paymore-chrome-v1.0.7.zip)
+**Download:** [paymore-1.0.7-chrome.zip](./paymore-1.0.7-chrome.zip)
 
 **What's New:**
 
@@ -154,19 +178,17 @@ Note: The packed version for Chrome Web Store submission is located at `.output/
 
 ### Installation
 
-1. Download [paymore-chrome-v1.0.7.zip](./paymore-chrome-v1.0.7.zip)
+1. Download [paymore-1.0.7-chrome.zip](./paymore-1.0.7-chrome.zip)
 2. Unzip the file
 3. Open Chrome and navigate to `chrome://extensions/`
 4. Enable "Developer mode" (toggle in top right)
 5. Click "Load unpacked"
-6. Select the unzipped `paymore-chrome` folder
-
-Note: The packed version for Chrome Web Store submission is located at `.output/paymore-chrome-v1.0.7-packed.zip`
+6. Select the unzipped `paymore` folder
 
 ### v1.0.6
 
 **Release Date:** October 04, 2025
-**Download:** [paymore-chrome-v1.0.6.zip](./paymore-chrome-v1.0.6.zip)
+**Download:** [paymore-1.0.6-chrome.zip](./paymore-1.0.6-chrome.zip)
 
 **What's New:**
 
@@ -218,7 +240,7 @@ Note: The packed version for Chrome Web Store submission is located at `.output/
 ### v1.0.5
 
 **Release Date:** October 03, 2025
-**Download:** [paymore-chrome-v1.0.5.zip](./paymore-chrome-v1.0.5.zip)
+**Download:** [paymore-1.0.5-chrome.zip](./paymore-1.0.5-chrome.zip)
 
 **What's New:**
 
@@ -228,7 +250,7 @@ Note: The packed version for Chrome Web Store submission is located at `.output/
 ### v1.0.4
 
 **Release Date:** October 03, 2025
-**Download:** [paymore-chrome-v1.0.4.zip](./paymore-chrome-v1.0.4.zip)
+**Download:** [paymore-1.0.4-chrome.zip](./paymore-1.0.4-chrome.zip)
 
 **What's New:**
 
@@ -238,7 +260,7 @@ Note: The packed version for Chrome Web Store submission is located at `.output/
 ### v1.0.0
 
 **Release Date:** October 03, 2025
-**Download:** [paymore-chrome-v1.0.0.zip](./paymore-chrome-v1.0.0.zip)
+**Download:** [paymore-1.0.0-chrome.zip](./paymore-1.0.0-chrome.zip)
 
 **What's New:**
 
@@ -248,17 +270,17 @@ Note: The packed version for Chrome Web Store submission is located at `.output/
 
 ## Installation Instructions
 
-1. Download `paymore-chrome-1.0.11-chrome.zip`
+1. Download `paymore-1.0.12-chrome.zip`
 2. Extract the ZIP file to a folder on your computer
 3. Open Chrome and go to `chrome://extensions/`
 4. Enable "Developer mode" in the top right
 5. Click "Load unpacked"
-6. Navigate to the extracted folder and select the `paymore-chrome` folder
+6. Navigate to the extracted folder and select the `paymore` folder
 7. The extension will be installed and ready to use
 
 ### For Chrome Web Store Submission
 
-The packed version is located at `.output/paymore-chrome-v1.0.11-packed.zip` and is ready for Chrome Web Store upload via the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole)
+The packed version is ready for Chrome Web Store upload via the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole)
 
 ## Keyboard Shortcuts Setup
 
@@ -274,13 +296,14 @@ After installation, you can customize keyboard shortcuts:
 ## Notes
 
 - Always download from official releases to ensure security
-- For the latest features and bug fixes, use the current release (v1.0.11)
+- For the latest features and bug fixes, use the current release (v1.0.12)
 - CMDK requires `bookmarks` and `history` permissions (granted on install)
 - Quick Links are cached for 30 minutes in Chrome storage
 - If you encounter issues, check the [CMDK_README.md](../docs/CMDK_README.md) for troubleshooting
 
 ## Changelog Summary
 
+**v1.0.12** - Enhanced context menu options, smarter CSV caching, package name simplification
 **v1.0.11** - Version bump and maintenance release
 **v1.0.10** - Bug fix for UPC Item Database search URL format
 **v1.0.9** - Release script integration, UI improvements, and deployment URL privacy

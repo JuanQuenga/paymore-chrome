@@ -139,10 +139,14 @@ export default defineBackground({
       }
     });
 
-    // Create a context menu item for searching selected text on eBay (sold listings)
+    // Create context menu items that operate on the current text selection
     try {
       const EBAY_SOLD_BASE =
         "https://www.ebay.com/sch/i.html?_nkw=iphone+15&_sacat=0&_from=R40&_dmd=2&rt=nc&LH_Sold=1&LH_Complete=1";
+      const UPC_LOOKUP_BASE = "https://www.upcitemdb.com/upc/";
+      const GOOGLE_UPC_BASE = "https://www.google.com/search?q=";
+      const PRICE_CHARTING_BASE =
+        "https://www.pricecharting.com/search-products?type=prices&q=grand+theft+auto&go=Go";
 
       // Ensure no stale items
       try {
@@ -154,7 +158,22 @@ export default defineBackground({
       try {
         chrome.contextMenus.create({
           id: "pm-search-ebay-sold",
-          title: 'Search eBay sold listings for "%s"',
+          title: "Search for sold listings on eBay",
+          contexts: ["selection"],
+        });
+        chrome.contextMenus.create({
+          id: "pm-search-google-upc",
+          title: "Search for UPC on Google",
+          contexts: ["selection"],
+        });
+        chrome.contextMenus.create({
+          id: "pm-search-upc",
+          title: "Search on UPCItemDB",
+          contexts: ["selection"],
+        });
+        chrome.contextMenus.create({
+          id: "pm-search-price-charting",
+          title: "Search on PriceCharting",
           contexts: ["selection"],
         });
       } catch (e) {
@@ -183,7 +202,44 @@ export default defineBackground({
           return;
         }
 
-        // only eBay handler kept
+        if (info.menuItemId === "pm-search-upc") {
+          try {
+            const url = `${UPC_LOOKUP_BASE}${encodeURIComponent(selection)}`;
+            chrome.tabs.create({ url });
+          } catch (err) {
+            log("Failed to open UPC search for selection", selection);
+          }
+          return;
+        }
+
+        if (info.menuItemId === "pm-search-google-upc") {
+          try {
+            const query = encodeURIComponent(`UPC for ${selection}`);
+            chrome.tabs.create({ url: `${GOOGLE_UPC_BASE}${query}` });
+          } catch (err) {
+            log("Failed to open Google UPC search for selection", selection);
+          }
+          return;
+        }
+
+        if (info.menuItemId === "pm-search-price-charting") {
+          try {
+            const u = new URL(PRICE_CHARTING_BASE);
+            u.searchParams.set("q", selection);
+            chrome.tabs.create({ url: u.href });
+          } catch (err) {
+            try {
+              const q = encodeURIComponent(selection);
+              const url = PRICE_CHARTING_BASE.replace(/q=[^&]*/, `q=${q}`);
+              chrome.tabs.create({ url });
+            } catch (error) {
+              log("Failed to open PriceCharting search", selection);
+            }
+          }
+          return;
+        }
+
+        // only known handlers kept
       });
     } catch (error) {
       /* noop */
