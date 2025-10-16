@@ -4,7 +4,35 @@ Download the latest and previous versions of the Paymore Chrome Extension.
 
 ## Latest Release
 
-### v1.0.13 (Current)
+### v1.0.14 (Current)
+
+**Release Date:** October 10, 2025
+**Download:** [paymore-1.0.14-chrome.zip](./paymore-1.0.14-chrome.zip)
+
+**What's New:**
+
+### Features
+
+- **UPC Highlighter** - Automatically detects 12-digit UPC codes on web pages and makes them clickable to copy to clipboard
+- **eBay Price Summary** - Shows average, median, high, and low sale prices for eBay sold listings with clickable metrics and quick filters
+- **Quick Actions Context Menu** - Enhanced right-click menu with quick actions including Copy, Paste, Open in New Tab, and Save As
+
+### Improvements
+
+- **Click-to-Copy UPC Codes** - Any highlighted UPC code can be clicked to instantly copy to clipboard
+- **eBay Price Analytics** - Price statistics display at the top of eBay search results with dismissible per-session controls
+- **Enhanced Context Menu** - PayMore Quick Actions section with streamlined workflow tools
+
+### Bug Fixes
+
+- Improved UPC code detection accuracy and highlighting
+- Better integration between content scripts and extension settings
+
+---
+
+## Previous Releases
+
+### v1.0.13
 
 **Release Date:** October 10, 2025
 **Download:** [paymore-1.0.13-chrome.zip](./paymore-1.0.13-chrome.zip)
@@ -20,8 +48,6 @@ Download the latest and previous versions of the Paymore Chrome Extension.
 - Expanded context menu search capabilities with MPN (Manufacturer Part Number) lookup
 
 ---
-
-## Previous Releases
 
 ### v1.0.12
 
@@ -278,7 +304,7 @@ Download the latest and previous versions of the Paymore Chrome Extension.
 
 ## Installation Instructions
 
-1. Download `paymore-1.0.13-chrome.zip`
+1. Download `paymore-1.0.14-chrome.zip`
 2. Extract the ZIP file to a folder on your computer
 3. Open Chrome and go to `chrome://extensions/`
 4. Enable "Developer mode" in the top right
@@ -304,13 +330,14 @@ After installation, you can customize keyboard shortcuts:
 ## Notes
 
 - Always download from official releases to ensure security
-- For the latest features and bug fixes, use the current release (v1.0.13)
+- For the latest features and bug fixes, use the current release (v1.0.14)
 - CMDK requires `bookmarks` and `history` permissions (granted on install)
 - Quick Links are cached for 30 minutes in Chrome storage
 - If you encounter issues, check the [CMDK_README.md](../docs/CMDK_README.md) for troubleshooting
 
 ## Changelog Summary
 
+**v1.0.14** - UPC Highlighter with click-to-copy, eBay Price Summary analytics, and Quick Actions context menu
 **v1.0.13** - Added MPN search context menu action
 **v1.0.12** - Enhanced context menu options, smarter CSV caching, package name simplification
 **v1.0.11** - Version bump and maintenance release

@@ -312,22 +312,9 @@ function initializeExtension() {
     attach("pm-tb-help", () => setActiveTool("help"));
     attach("pm-tb-settings", () => {
       try {
-        chrome.runtime.sendMessage({ action: "OPEN_OPTIONS" }, (response) => {
-          const err = chrome.runtime.lastError;
-          if (err) {
-            console.error(
-              "[Paymore CS] Failed to trigger options popup:",
-              err
-            );
-          } else if (!response?.success) {
-            console.error(
-              "[Paymore CS] Background did not open options popup",
-              response
-            );
-          }
-        });
+        chrome.runtime.sendMessage({ action: "openInSidebar", tool: "settings" });
       } catch (e) {
-        console.error("[Paymore CS] Failed to send options message:", e);
+        console.error("[Paymore CS] Failed to open settings in sidebar:", e);
       }
     });
     attach("pm-tb-top-offers", () => setActiveTool("top-offers"));

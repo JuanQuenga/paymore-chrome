@@ -27,8 +27,34 @@ import { ToolbarItem } from "./ToolbarItem";
 import { BookmarkItem } from "./BookmarkItem";
 import { HistoryItemComponent } from "./HistoryItem";
 import { Skeleton } from "@/src/components/ui/skeleton";
-import { X, Search as SearchIcon, Layers } from "lucide-react";
+import {
+  X,
+  Search as SearchIcon,
+  Gamepad2,
+  Layers,
+  Settings,
+} from "lucide-react";
 import "./styles.css";
+
+const DEFAULT_ENABLED_SOURCES = {
+  tabs: true,
+  bookmarks: true,
+  history: true,
+  quickLinks: true,
+  tools: true,
+  searchProviders: true,
+  ebayCategories: true,
+} as const;
+
+const DEFAULT_SOURCE_ORDER = [
+  "tabs",
+  "quickLinks",
+  "ebayCategories",
+  "bookmarks",
+  "tools",
+  "searchProviders",
+  "history",
+] as const;
 
 interface CMDKPaletteProps {
   isOpen: boolean;
@@ -43,6 +69,7 @@ export function CMDKPalette({
 }: CMDKPaletteProps) {
   const [search, setSearch] = useState("");
   const [tabs, setTabs] = useState<TabInfo[]>([]);
+  const [previousTabId, setPreviousTabId] = useState<number | null>(null);
   const [csvLinks, setCSVLinks] = useState<CSVLink[]>([]);
   const [csvLinksLoading, setCSVLinksLoading] = useState(false);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
@@ -55,35 +82,49 @@ export function CMDKPalette({
   const [ebayLoading, setEbayLoading] = useState(false);
   const [copiedEbayId, setCopiedEbayId] = useState<string | null>(null);
   const [userNavigated, setUserNavigated] = useState(false);
+  const [selectedValue, setSelectedValue] = useState<string>("");
   const listRef = useRef<HTMLDivElement>(null);
   const [enabledSources, setEnabledSources] = useState({
-    tabs: true,
-    bookmarks: true,
-    history: true,
-    quickLinks: true,
-    tools: true,
-    searchProviders: true,
-    ebayCategories: true,
+    ...DEFAULT_ENABLED_SOURCES,
   });
   const [sourceOrder, setSourceOrder] = useState<string[]>([
-    "quickLinks",
-    "ebayCategories",
-    "tools",
-    "tabs",
-    "bookmarks",
-    "searchProviders",
-    "history",
+    ...DEFAULT_SOURCE_ORDER,
   ]);
   const trimmedSearch = search.trim();
+  const previousTab =
+    previousTabId !== null
+      ? tabs.find((tab) => tab.id === previousTabId) ?? null
+      : null;
+  const previousTabLabel = previousTab?.title?.trim() || previousTab?.url || "";
+  const showPreviousTabHint =
+    !activeProvider && !trimmedSearch && Boolean(previousTabLabel);
 
   useEffect(() => {
     // Load settings from chrome storage
     chrome.storage.sync.get(["cmdkSettings"], (result: any) => {
-      if (result.cmdkSettings?.enabledSources) {
-        setEnabledSources(result.cmdkSettings.enabledSources);
-      }
-      if (result.cmdkSettings?.sourceOrder) {
-        setSourceOrder(result.cmdkSettings.sourceOrder);
+      if (result.cmdkSettings) {
+        if (result.cmdkSettings.enabledSources) {
+          setEnabledSources((prev) => ({
+            ...DEFAULT_ENABLED_SOURCES,
+            ...prev,
+            ...result.cmdkSettings.enabledSources,
+          }));
+        }
+        if (Array.isArray(result.cmdkSettings.sourceOrder)) {
+          setSourceOrder(() => {
+            const storedOrder = result.cmdkSettings.sourceOrder.filter(
+              (key: string) =>
+                (DEFAULT_SOURCE_ORDER as readonly string[]).includes(key)
+            );
+            const mergedOrder = [...storedOrder];
+            for (const key of DEFAULT_SOURCE_ORDER) {
+              if (!mergedOrder.includes(key)) {
+                mergedOrder.push(key);
+              }
+            }
+            return mergedOrder;
+          });
+        }
       }
     });
   }, []);
@@ -98,13 +139,18 @@ export function CMDKPalette({
       setActiveProvider(null);
       setProviderQuery("");
       setUserNavigated(false);
+      setSelectedValue("");
     }
   }, [isOpen, enabledSources]);
 
   const loadTabs = async () => {
-    const allTabs = await TabManager.getAllTabs();
+    const [allTabs, prevTabId] = await Promise.all([
+      TabManager.getAllTabs(),
+      TabManager.getPreviousTab(),
+    ]);
     const sorted = TabManager.sortTabs(allTabs);
     setTabs(sorted);
+    setPreviousTabId(prevTabId);
   };
 
   const loadCSVLinks = async () => {
@@ -164,8 +210,15 @@ export function CMDKPalette({
       const provider = findProviderByTrigger(search);
       if (provider) {
         e.preventDefault();
+        // If the user typed the trigger followed by a query, preserve the remainder
+        const lower = search.toLowerCase().trim();
+        const matchedTrigger =
+          provider.trigger.find((t) => lower.startsWith(t)) || "";
+        const remainder = matchedTrigger
+          ? search.slice(matchedTrigger.length).trim()
+          : "";
         setActiveProvider(provider);
-        setProviderQuery("");
+        setProviderQuery(remainder);
         setSearch("");
       }
     }
@@ -343,7 +396,9 @@ export function CMDKPalette({
   const filteredTabs =
     activeProvider || !enabledSources.tabs
       ? []
-      : TabManager.filterTabs(tabs, search);
+      : TabManager.filterTabs(tabs, search).filter(
+          (tab) => !showPreviousTabHint || tab.id !== previousTabId
+        );
   const filteredCSVLinks =
     activeProvider || !enabledSources.quickLinks
       ? []
@@ -409,7 +464,35 @@ export function CMDKPalette({
     await openUrlAndClose(url);
   };
 
-  // Group CSV links by category and sort alphabetically
+  const openSettings = async () => {
+    // Open settings page in a new tab
+    const optionsUrl = chrome.runtime.getURL("options.html");
+    await TabManager.openNewTab(optionsUrl);
+    onClose();
+  };
+
+  const openControllerTesting = async () => {
+    // Send message to open controller testing in sidebar
+    try {
+      const response = await new Promise<any>((resolve) => {
+        try {
+          chrome.runtime.sendMessage(
+            { action: "openInSidebar", tool: "controller-testing" },
+            (resp: any) => resolve(resp)
+          );
+        } catch (err) {
+          resolve({ success: false, error: String(err) });
+        }
+      });
+      if (!response?.success && chrome.runtime.lastError) {
+        console.error("Error opening sidebar:", chrome.runtime.lastError);
+      }
+    } finally {
+      onClose();
+    }
+  };
+
+  // Group CSV links by category
   const csvLinksByCategory = filteredCSVLinks.reduce((acc, link) => {
     const category = link.category || "General";
     if (!acc[category]) acc[category] = [];
@@ -417,12 +500,10 @@ export function CMDKPalette({
     return acc;
   }, {} as Record<string, CSVLink[]>);
 
-  // Sort categories in reverse alphabetical order, but put "Warranty" first
-  const sortedCategories = Object.keys(csvLinksByCategory).sort((a, b) => {
-    if (a.toLowerCase() === "warranty") return -1;
-    if (b.toLowerCase() === "warranty") return 1;
-    return b.localeCompare(a); // Reversed: b comes before a
-  });
+  // Sort categories alphabetically
+  const sortedCategories = Object.keys(csvLinksByCategory).sort((a, b) =>
+    a.localeCompare(b)
+  );
 
   // Sort links within each category alphabetically by title
   sortedCategories.forEach((category) => {
@@ -439,11 +520,21 @@ export function CMDKPalette({
 
   if (!isOpen) return null;
 
+  // Set initial selected value when previous tab is shown
+  useEffect(() => {
+    if (isOpen && showPreviousTabHint && previousTab && !selectedValue) {
+      setSelectedValue(`tab-${previousTab.id}`);
+    }
+  }, [isOpen, showPreviousTabHint, previousTab, selectedValue]);
+
   const content = (
     <Command
       shouldFilter={false}
+      filter={() => 1}
       onKeyDown={handleKeyDown}
       className="cmdk-root"
+      value={selectedValue}
+      onValueChange={setSelectedValue}
     >
       <div className="cmdk-input-wrapper">
         {activeProvider && (
@@ -463,43 +554,71 @@ export function CMDKPalette({
             </button>
           </div>
         )}
-        <Command.Input
-          value={activeProvider ? providerQuery : search}
-          onValueChange={activeProvider ? setProviderQuery : handleValueChange}
-          placeholder={
-            activeProvider
-              ? `Search ${activeProvider.name}...`
-              : "Search tabs or type a command..."
-          }
-          className="cmdk-input"
-          autoFocus
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              // Only handle Enter for search providers or empty searches WITHOUT user navigation
-              if (activeProvider && providerQuery.trim()) {
-                e.preventDefault();
-                handleSearchSubmit();
-              } else if (!trimmedSearch && !activeProvider && !userNavigated) {
-                // Empty input with no arrow key navigation - go to previous tab
-                e.preventDefault();
-                handleSearchSubmit();
-              } else if (!activeProvider && trimmedSearch) {
-                const urlCandidate = getUrlFromInput(trimmedSearch);
-                if (urlCandidate) {
-                  e.preventDefault();
-                  void openUrlAndClose(urlCandidate);
-                  return;
-                }
-
-                if (!hasVisibleItems) {
-                  e.preventDefault();
-                  void openGoogleSearch(trimmedSearch);
-                }
-              }
-              // Otherwise, let CMDK's default Enter behavior select the highlighted item
+        <div className="cmdk-input-shell">
+          <Command.Input
+            value={activeProvider ? providerQuery : search}
+            onValueChange={
+              activeProvider ? setProviderQuery : handleValueChange
             }
-          }}
-        />
+            placeholder={
+              activeProvider
+                ? `Search ${activeProvider.name}...`
+                : showPreviousTabHint
+                ? "Search or press Enter to switch tabs..."
+                : "Search tabs or type a command..."
+            }
+            className="cmdk-input"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                // Only handle Enter for search providers or empty searches WITHOUT user navigation
+                if (activeProvider && providerQuery.trim()) {
+                  e.preventDefault();
+                  handleSearchSubmit();
+                } else if (
+                  !trimmedSearch &&
+                  !activeProvider &&
+                  !userNavigated
+                ) {
+                  // Empty input with no arrow key navigation - go to previous tab
+                  e.preventDefault();
+                  handleSearchSubmit();
+                } else if (!activeProvider && trimmedSearch) {
+                  const urlCandidate = getUrlFromInput(trimmedSearch);
+                  if (urlCandidate) {
+                    e.preventDefault();
+                    void openUrlAndClose(urlCandidate);
+                    return;
+                  }
+
+                  if (!hasVisibleItems) {
+                    e.preventDefault();
+                    void openGoogleSearch(trimmedSearch);
+                  }
+                }
+                // Otherwise, let CMDK's default Enter behavior select the highlighted item
+              }
+            }}
+          />
+        </div>
+        {!trimmedSearch && !activeProvider && (
+          <div className="flex gap-2">
+            <button
+              onClick={openControllerTesting}
+              className="cmdk-settings-button"
+              title="Controller Testing"
+            >
+              <Gamepad2 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={openSettings}
+              className="cmdk-settings-button"
+              title="Settings"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       <Command.List className="cmdk-list" ref={listRef}>
@@ -526,52 +645,108 @@ export function CMDKPalette({
           <>
             {/* Show all search providers when one is active - for switching */}
             <Command.Group heading="Search Providers" className="cmdk-group">
-              {searchProviders.map((provider) => (
-                <Command.Item
-                  key={provider.id}
-                  value={`provider-switch-${provider.id}`}
-                  onSelect={handleSelect}
-                  keywords={[provider.name, ...provider.trigger]}
-                  className="cmdk-item"
-                >
-                  <div className="flex items-center gap-3 px-4 py-3">
-                    <div className={`p-2 rounded ${provider.color}`}>
-                      <provider.icon className="w-4 h-4 text-white" />
+              {searchProviders
+                .filter((p: SearchProvider) => !p.hideInSwitcher)
+                .map((provider: SearchProvider) => (
+                  <Command.Item
+                    key={provider.id}
+                    value={`provider-switch-${provider.id}`}
+                    onSelect={handleSelect}
+                    keywords={[provider.name, ...provider.trigger]}
+                    className="cmdk-item"
+                  >
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <div className={`p-2 rounded ${provider.color}`}>
+                        <provider.icon className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {provider.name}
+                          {provider.id === activeProvider?.id && (
+                            <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                              Active
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {provider.id === activeProvider?.id ? (
+                            <>
+                              Press <kbd className="cmdk-kbd">Enter</kbd> to
+                              search
+                            </>
+                          ) : (
+                            "Click to switch"
+                          )}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {provider.name}
-                        {provider.id === activeProvider.id && (
-                          <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
-                            Active
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {provider.id === activeProvider.id
-                          ? "Press Enter to search"
-                          : "Click to switch"}
-                      </p>
-                    </div>
-                  </div>
-                </Command.Item>
-              ))}
+                  </Command.Item>
+                ))}
             </Command.Group>
           </>
         )}
 
         {!activeProvider && (
           <>
-            {/* Render sources in the order specified by sourceOrder */}
-            {sourceOrder.map((sourceKey) => {
+            {/* Previous Tab - shown as first option when no search */}
+            {showPreviousTabHint && previousTab && (
+              <Command.Group heading="Previous Tab" className="cmdk-group">
+                <Command.Item
+                  key={`tab-${previousTab.id}`}
+                  value={`tab-${previousTab.id}`}
+                  onSelect={handleSelect}
+                  className="cmdk-item"
+                >
+                  <TabItem tab={previousTab} kbdHintAction="Switch to tab" />
+                </Command.Item>
+              </Command.Group>
+            )}
+
+            {/* Render sources - use sourceOrder for initial state, relevance order when searching */}
+            {(trimmedSearch
+              ? [
+                  "tabs",
+                  "quickLinks",
+                  "ebayCategories",
+                  "tools",
+                  "bookmarks",
+                  "searchProviders",
+                  "history",
+                ]
+              : sourceOrder
+            ).map((sourceKey) => {
               switch (sourceKey) {
+                case "tabs":
+                  return (
+                    <React.Fragment key="tabs">
+                      {/* Tabs */}
+                      {filteredTabs.length > 0 && (
+                        <Command.Group heading="Tabs" className="cmdk-group">
+                          {filteredTabs.map((tab) => (
+                            <Command.Item
+                              key={tab.id}
+                              value={`tab-${tab.id}`}
+                              onSelect={handleSelect}
+                              className="cmdk-item"
+                            >
+                              <TabItem
+                                tab={tab}
+                                kbdHintAction="Switch to tab"
+                              />
+                            </Command.Item>
+                          ))}
+                        </Command.Group>
+                      )}
+                    </React.Fragment>
+                  );
+
                 case "quickLinks":
                   return (
                     <React.Fragment key="quickLinks">
-                      {/* Quick Links Loading Skeleton */}
+                      {/* Scout Links Loading Skeleton */}
                       {csvLinksLoading && (
                         <Command.Group
-                          heading="Quick Links"
+                          heading="Scout Links"
                           className="cmdk-group"
                         >
                           {[1, 2, 3].map((i) => (
@@ -588,7 +763,7 @@ export function CMDKPalette({
                         </Command.Group>
                       )}
 
-                      {/* Quick Links - sorted alphabetically by category */}
+                      {/* Scout Links - sorted alphabetically by category */}
                       {!csvLinksLoading &&
                         sortedCategories.map((category) => (
                           <Command.Group
@@ -707,7 +882,7 @@ export function CMDKPalette({
                 case "tools":
                   return (
                     <React.Fragment key="tools">
-                      {/* Toolbar Tools */}
+                      {/* Tools */}
                       {filteredTools.length > 0 && (
                         <Command.Group heading="Tools" className="cmdk-group">
                           {filteredTools.map((tool) => (
@@ -717,34 +892,32 @@ export function CMDKPalette({
                               onSelect={handleSelect}
                               className="cmdk-item"
                             >
-                              <ToolbarItem
-                                tool={tool}
-                                kbdHintAction="Open tool"
-                              />
-                            </Command.Item>
-                          ))}
-                        </Command.Group>
-                      )}
-                    </React.Fragment>
-                  );
-
-                case "tabs":
-                  return (
-                    <React.Fragment key="tabs">
-                      {/* Tab results */}
-                      {filteredTabs.length > 0 && (
-                        <Command.Group heading="Tabs" className="cmdk-group">
-                          {filteredTabs.map((tab) => (
-                            <Command.Item
-                              key={tab.id}
-                              value={`tab-${tab.id}`}
-                              onSelect={handleSelect}
-                              className="cmdk-item"
-                            >
-                              <TabItem
-                                tab={tab}
-                                kbdHintAction="Switch to tab"
-                              />
+                              <div className="flex items-center gap-3 px-4 py-3 w-full">
+                                <div className="p-2 rounded bg-blue-500">
+                                  {tool.reactIcon ? (
+                                    <tool.reactIcon className="w-4 h-4 text-white" />
+                                  ) : tool.img ? (
+                                    <img 
+                                      src={tool.img} 
+                                      alt={tool.label}
+                                      className="w-4 h-4"
+                                    />
+                                  ) : (
+                                    <Gamepad2 className="w-4 h-4 text-white" />
+                                  )}
+                                </div>
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    {tool.label}
+                                  </p>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    {tool.description}
+                                  </p>
+                                </div>
+                                <div className="cmdk-item-kbd-hint">
+                                  <kbd className="cmdk-kbd">↵</kbd>
+                                </div>
+                              </div>
                             </Command.Item>
                           ))}
                         </Command.Group>
@@ -756,15 +929,17 @@ export function CMDKPalette({
                   return (
                     <React.Fragment key="searchProviders">
                       {/* Search providers */}
-                      {trimmedSearch && enabledSources.searchProviders && (
+                      {enabledSources.searchProviders && (
                         <Command.Group heading="Search" className="cmdk-group">
                           {searchProviders
-                            .filter((provider) =>
-                              provider.trigger.some((t) =>
-                                t.startsWith(search.toLowerCase())
-                              )
+                            .filter(
+                              (provider: SearchProvider) =>
+                                !trimmedSearch ||
+                                provider.trigger.some((t) =>
+                                  t.startsWith(search.toLowerCase())
+                                )
                             )
-                            .map((provider) => (
+                            .map((provider: SearchProvider) => (
                               <Command.Item
                                 key={provider.id}
                                 value={`provider-${provider.id}`}

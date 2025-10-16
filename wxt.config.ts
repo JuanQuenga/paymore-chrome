@@ -35,6 +35,12 @@ export default defineConfig({
         all_frames: true,
       },
       {
+        matches: ["https://www.ebay.com/sch/*"],
+        js: ["ebay-sold-summary.js"],
+        run_at: "document_idle",
+        all_frames: false,
+      },
+      {
         matches: ["*://pos.paymore.tech/inventory*"],
         js: ["content-pos-inventory.js"],
         run_at: "document_idle",

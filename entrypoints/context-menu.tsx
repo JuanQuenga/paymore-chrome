@@ -18,6 +18,7 @@ import {
   XCircle,
   Printer,
   Settings,
+  Trash2,
 } from "lucide-react";
 
 /**
@@ -210,7 +211,7 @@ export default defineContentScript({
       },
       {
         id: "save-as",
-        label: "Save As",
+        label: "Save",
         icon: Download,
         requiresUrl: true,
         onInvoke: () => {
@@ -235,12 +236,46 @@ export default defineContentScript({
         },
       },
       {
+        id: "delete-element",
+        label: "Delete Element",
+        icon: Trash2,
+        onInvoke: () => {
+          try {
+            if (clickedElement) {
+              // Store the element to delete
+              const elementToDelete = clickedElement;
+
+              // Close menu first
+              closeMenu();
+
+              // Add a fade-out animation before removing
+              elementToDelete.style.transition = "opacity 0.2s";
+              elementToDelete.style.opacity = "0";
+
+              // Remove element after animation
+              setTimeout(() => {
+                elementToDelete.remove();
+                log("Element deleted:", elementToDelete);
+              }, 200);
+            } else {
+              log("No element to delete");
+            }
+          } catch (err) {
+            log("Delete element error:", err);
+          }
+        },
+      },
+      {
         id: "print",
         label: "Print",
         icon: Printer,
         onInvoke: () => {
           try {
-            window.print();
+            // Close menu first, then print after a brief delay to ensure menu is hidden
+            closeMenu();
+            setTimeout(() => {
+              window.print();
+            }, 100);
           } catch (err) {
             log("Print error:", err);
           }

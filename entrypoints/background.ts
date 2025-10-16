@@ -131,7 +131,7 @@ export default defineBackground({
         });
       } else if (command === "open-options") {
         log("Open options command triggered");
-        chrome.runtime.openOptionsPage();
+        chrome.tabs.create({ url: chrome.runtime.getURL("options.html") });
       } else if (command === "open-toolbar-sidepanel") {
         log("Open toolbar sidepanel command triggered");
         chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {

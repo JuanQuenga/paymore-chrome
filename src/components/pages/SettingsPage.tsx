@@ -69,6 +69,7 @@ interface CmdkSettings {
   controllerTesting?: {
     lightThreshold: number;
     mediumThreshold: number;
+    autoOpen?: boolean;
   };
   bookmarkFolderIds?: string[];
   ebaySummary?: {
@@ -130,6 +131,7 @@ const BASE_CMDK_SETTINGS: CmdkSettings = {
   controllerTesting: {
     lightThreshold: 0.1,
     mediumThreshold: 0.25,
+    autoOpen: true,
   },
   bookmarkFolderIds: [],
   ebaySummary: {
@@ -165,6 +167,7 @@ const createDefaultCmdkSettings = (): CmdkSettings => ({
     lightThreshold: BASE_CMDK_SETTINGS.controllerTesting?.lightThreshold ?? 0.1,
     mediumThreshold:
       BASE_CMDK_SETTINGS.controllerTesting?.mediumThreshold ?? 0.25,
+    autoOpen: BASE_CMDK_SETTINGS.controllerTesting?.autoOpen ?? true,
   },
   bookmarkFolderIds: BASE_CMDK_SETTINGS.bookmarkFolderIds
     ? [...BASE_CMDK_SETTINGS.bookmarkFolderIds]
@@ -229,6 +232,10 @@ const mergeCmdkSettings = (stored?: Partial<CmdkSettings>): CmdkSettings => {
       stored.controllerTesting?.mediumThreshold ??
       defaults.controllerTesting?.mediumThreshold ??
       0.25,
+    autoOpen:
+      stored.controllerTesting?.autoOpen ??
+      defaults.controllerTesting?.autoOpen ??
+      true,
   };
 
   const mergedEbaySummary = {
@@ -361,6 +368,7 @@ export default function SettingsPage() {
     DEFAULT_ENABLED_TOOLS
   );
   const [toolbarTheme, setToolbarTheme] = useState<string>("stone");
+  const [toolbarHue, setToolbarHue] = useState<number>(0);
   const [scannerBaseUrl, setScannerBaseUrl] = useState<string>(HOSTED_URL);
   const [version, setVersion] = useState<string>("");
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -389,6 +397,13 @@ export default function SettingsPage() {
     const initialHash = window.location.hash?.replace("#", "");
     if (initialHash) {
       setActiveNav(initialHash);
+      // Scroll to the section after a short delay to ensure DOM is ready
+      setTimeout(() => {
+        const element = document.getElementById(initialHash);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 100);
     }
 
     try {
@@ -430,7 +445,15 @@ export default function SettingsPage() {
     try {
       chrome.storage.sync.get(["cmdkSettings"], (result: any) => {
         if (result?.cmdkSettings) {
-          setCmdkSettings(mergeCmdkSettings(result.cmdkSettings));
+          const merged = mergeCmdkSettings(result.cmdkSettings);
+          setCmdkSettings(merged);
+
+          // Sync autoOpen setting to chrome.storage.local for content script
+          try {
+            chrome.storage.local.set({ autoShowModal: merged.controllerTesting?.autoOpen ?? true });
+          } catch (error) {
+            // Ignore storage failures
+          }
         }
       });
     } catch (error) {
@@ -444,6 +467,29 @@ export default function SettingsPage() {
       }
     } catch (error) {
       // Ignore runtime access issues
+    }
+
+    // Load bookmark folders
+    try {
+      chrome.bookmarks.getTree((bookmarkTreeNodes: any[]) => {
+        const folders: any[] = [];
+        const traverseTree = (nodes: any[]) => {
+          nodes.forEach((node: any) => {
+            if (node.children) {
+              // This is a folder
+              folders.push({
+                id: node.id,
+                title: node.title || "Bookmarks",
+              });
+              traverseTree(node.children);
+            }
+          });
+        };
+        traverseTree(bookmarkTreeNodes);
+        setBookmarkFolders(folders);
+      });
+    } catch (error) {
+      // Ignore bookmark access failures
     }
 
     return () => {
@@ -514,6 +560,43 @@ export default function SettingsPage() {
     flashSaved(setToolbarSaved);
   };
 
+  const handleHueChange = (hue: number) => {
+    setToolbarHue(hue);
+    // Convert hue to closest named color theme
+    const hueThemeMap = [
+      { hue: 0, theme: "rose" },
+      { hue: 20, theme: "orange" },
+      { hue: 45, theme: "amber" },
+      { hue: 160, theme: "emerald" },
+      { hue: 180, theme: "cyan" },
+      { hue: 190, theme: "teal" },
+      { hue: 210, theme: "blue" },
+      { hue: 220, theme: "indigo" },
+      { hue: 260, theme: "violet" },
+      { hue: 300, theme: "stone" }, // neutral
+    ];
+
+    // Find closest hue
+    let closestTheme = hueThemeMap[0];
+    let minDiff = Math.abs(hue - hueThemeMap[0].hue);
+
+    hueThemeMap.forEach(({ hue: targetHue, theme }) => {
+      const diff = Math.min(
+        Math.abs(hue - targetHue),
+        Math.abs(hue + 360 - targetHue),
+        Math.abs(hue - 360 - targetHue)
+      );
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestTheme = { hue: targetHue, theme };
+      }
+    });
+
+    setToolbarTheme(closestTheme.theme);
+    persistSettings(enabledTools, undefined, closestTheme.theme);
+    flashSaved(setToolbarSaved);
+  };
+
   const handleToggleSource = (source: keyof CmdkSources) => {
     const next = {
       ...cmdkSettings,
@@ -559,6 +642,13 @@ export default function SettingsPage() {
       action: "upc-highlighter-settings-changed",
       enabled: defaults.upcHighlighter.enabled,
     });
+
+    // Also update chrome.storage.local for the content script
+    try {
+      chrome.storage.local.set({ autoShowModal: defaults.controllerTesting?.autoOpen ?? true });
+    } catch (error) {
+      // Ignore storage failures
+    }
   };
 
   const handleResetToolbar = () => {
@@ -719,6 +809,29 @@ export default function SettingsPage() {
     };
     setCmdkSettings(newSettings);
     saveCmdkSettings(newSettings);
+  };
+
+  const handleControllerAutoOpenChange = (enabled: boolean) => {
+    const newControllerTesting = {
+      ...cmdkSettings.controllerTesting,
+      lightThreshold: cmdkSettings.controllerTesting?.lightThreshold ?? 0.1,
+      mediumThreshold: cmdkSettings.controllerTesting?.mediumThreshold ?? 0.25,
+      autoOpen: enabled,
+    };
+
+    const newSettings = {
+      ...cmdkSettings,
+      controllerTesting: newControllerTesting,
+    };
+    setCmdkSettings(newSettings);
+    saveCmdkSettings(newSettings);
+
+    // Also update chrome.storage.local for the content script
+    try {
+      chrome.storage.local.set({ autoShowModal: enabled });
+    } catch (error) {
+      // Ignore storage failures
+    }
   };
 
   const handleBookmarkFolderToggle = (folderId: string) => {
@@ -954,7 +1067,16 @@ export default function SettingsPage() {
                 <a
                   key={item.id}
                   href={`#${item.id}`}
-                  onClick={() => setActiveNav(item.id)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setActiveNav(item.id);
+                    const element = document.getElementById(item.id);
+                    if (element) {
+                      element.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }
+                    // Update URL hash without triggering page jump
+                    window.history.pushState(null, "", `#${item.id}`);
+                  }}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg hover:bg-muted/50 transition-colors",
                     activeNav === item.id
@@ -1495,13 +1617,50 @@ export default function SettingsPage() {
               <h2 className="text-2xl font-bold mb-2">Controller Testing</h2>
               <p className="text-muted-foreground">
                 Adjust color change thresholds for controller input
-                visualization
+                visualization and auto-open behavior
               </p>
             </div>
 
             <div className="bg-card rounded-xl border border-border shadow-lg overflow-hidden">
               <div className="p-8">
                 <div className="space-y-6">
+                  {/* Auto-Open Toggle */}
+                  <div className="p-4 bg-muted/20 rounded-lg border border-border/50">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-base mb-2">
+                          Auto-Open Controller Testing
+                        </h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          Automatically open the controller testing panel when a
+                          game controller is connected and becomes active. Disable
+                          this if you want to manually open the controller testing
+                          panel.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() =>
+                          handleControllerAutoOpenChange(
+                            !(cmdkSettings.controllerTesting?.autoOpen ?? true)
+                          )
+                        }
+                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                          cmdkSettings.controllerTesting?.autoOpen ?? true
+                            ? "bg-primary"
+                            : "bg-muted-foreground/30"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+                            cmdkSettings.controllerTesting?.autoOpen ?? true
+                              ? "translate-x-6"
+                              : "translate-x-1"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="p-4 bg-muted/20 rounded-lg border border-border/50">
                     <p className="text-sm text-muted-foreground mb-4">
                       Set the thresholds at which controller inputs change
@@ -1926,84 +2085,181 @@ export default function SettingsPage() {
             <div className="mb-6">
               <h2 className="text-2xl font-bold mb-2">Toolbar</h2>
               <p className="text-muted-foreground">
-                Choose which quick-action tools appear in the floating toolbar
-                and set its theme
+                Customize the floating toolbar appearance and available tools
               </p>
             </div>
 
-            <div className="bg-card rounded-xl border border-border shadow-lg overflow-hidden">
-              <div className="p-8">
-                <div className="space-y-6">
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {TOOLBAR_TOOLS.map((tool) => {
-                      const active = enabledTools.includes(tool.id);
-
-                      return (
-                        <Toggle
-                          key={tool.id}
-                          data-state={active ? "on" : "off"}
-                          variant="outline"
-                          className={cn(
-                            "h-24 select-none border border-dashed",
-                            active
-                              ? "border-primary bg-primary/10 text-primary"
-                              : "border-border/60"
-                          )}
-                          onClick={() => toggleTool(tool.id)}
-                          aria-pressed={active}
-                        >
-                          <div className="mb-2">{getToolIcon(tool)}</div>
-                          <span className="text-sm font-semibold leading-tight">
-                            {tool.label}
-                          </span>
-                          {tool.description && (
-                            <span className="mt-1 text-xs text-muted-foreground">
-                              {tool.description}
-                            </span>
-                          )}
-                        </Toggle>
-                      );
-                    })}
-                  </div>
-
-                  <div className="space-y-3">
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Toolbar color theme
-                    </p>
-                    <div className="grid grid-cols-6 gap-2 sm:grid-cols-8 md:grid-cols-12">
-                      {[
-                        { id: "stone", bg: "bg-stone-800" },
-                        { id: "zinc", bg: "bg-zinc-800" },
-                        { id: "slate", bg: "bg-slate-800" },
-                        { id: "blue", bg: "bg-blue-700" },
-                        { id: "emerald", bg: "bg-emerald-700" },
-                        { id: "rose", bg: "bg-rose-700" },
-                        { id: "violet", bg: "bg-violet-700" },
-                        { id: "orange", bg: "bg-orange-700" },
-                        { id: "indigo", bg: "bg-indigo-700" },
-                        { id: "teal", bg: "bg-teal-700" },
-                        { id: "cyan", bg: "bg-cyan-700" },
-                        { id: "amber", bg: "bg-amber-700" },
-                      ].map((option) => (
-                        <button
-                          key={option.id}
-                          type="button"
-                          aria-label={`Theme ${option.id}`}
-                          onClick={() => handleThemeChange(option.id)}
-                          className={cn(
-                            "h-9 w-full rounded-md border",
-                            option.bg,
-                            toolbarTheme === option.id
-                              ? "ring-2 ring-offset-2 ring-primary"
-                              : "border-border/70"
-                          )}
-                        />
-                      ))}
+            <div className="space-y-6">
+              {/* Toolbar Theme Card */}
+              <div className="bg-card rounded-xl border border-border shadow-lg overflow-hidden">
+                <div className="p-8">
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-2">Toolbar Theme</h3>
+                      <p className="text-sm text-muted-foreground mb-6">
+                        Select a color theme for the floating toolbar that appears on every page
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Updates the floating toolbar colors on every page where
-                      PayMore is active.
-                    </p>
+
+                    {/* Hue Slider Section */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium">Color</label>
+                        <div className="flex items-center gap-3">
+                          {/* Color Preview Circle */}
+                          <div
+                            className={cn(
+                              "h-10 w-10 rounded-full border-2 border-white shadow-lg transition-all",
+                              {
+                                "bg-stone-700": toolbarTheme === "stone",
+                                "bg-zinc-700": toolbarTheme === "zinc",
+                                "bg-slate-700": toolbarTheme === "slate",
+                                "bg-blue-600": toolbarTheme === "blue",
+                                "bg-emerald-600": toolbarTheme === "emerald",
+                                "bg-rose-600": toolbarTheme === "rose",
+                                "bg-violet-600": toolbarTheme === "violet",
+                                "bg-orange-600": toolbarTheme === "orange",
+                                "bg-indigo-600": toolbarTheme === "indigo",
+                                "bg-teal-600": toolbarTheme === "teal",
+                                "bg-cyan-600": toolbarTheme === "cyan",
+                                "bg-amber-600": toolbarTheme === "amber",
+                              }
+                            )}
+                          />
+                          <span className="text-sm font-medium capitalize min-w-[80px]">
+                            {toolbarTheme}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Hue Slider */}
+                      <div className="relative">
+                        <input
+                          type="range"
+                          min="0"
+                          max="360"
+                          value={toolbarHue}
+                          onChange={(e) => handleHueChange(parseInt(e.target.value))}
+                          className="w-full h-3 rounded-lg appearance-none cursor-pointer"
+                          style={{
+                            background: "linear-gradient(to right, hsl(0, 80%, 60%), hsl(30, 80%, 60%), hsl(60, 80%, 60%), hsl(120, 80%, 60%), hsl(180, 80%, 60%), hsl(240, 80%, 60%), hsl(300, 80%, 60%), hsl(360, 80%, 60%))",
+                          }}
+                        />
+                      </div>
+
+                      <p className="text-xs text-muted-foreground">
+                        Drag the slider to choose a color theme. Changes apply instantly to all pages.
+                      </p>
+                    </div>
+
+                    {/* Quick Presets */}
+                    <div className="pt-4 border-t border-border/50">
+                      <p className="text-xs font-medium text-muted-foreground mb-3">Quick Presets</p>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { id: "stone", label: "Stone", hue: 300 },
+                          { id: "blue", label: "Blue", hue: 210 },
+                          { id: "emerald", label: "Emerald", hue: 160 },
+                          { id: "rose", label: "Rose", hue: 0 },
+                          { id: "violet", label: "Violet", hue: 260 },
+                          { id: "amber", label: "Amber", hue: 45 },
+                        ].map((preset) => (
+                          <button
+                            key={preset.id}
+                            onClick={() => {
+                              setToolbarHue(preset.hue);
+                              handleThemeChange(preset.id);
+                            }}
+                            className={cn(
+                              "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                              toolbarTheme === preset.id
+                                ? "bg-primary text-primary-foreground shadow-sm"
+                                : "bg-muted hover:bg-muted/80"
+                            )}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Toolbar Tools Card */}
+              <div className="bg-card rounded-xl border border-border shadow-lg overflow-hidden">
+                <div className="p-8">
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2">Available Tools</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Select which quick-action tools appear in the floating toolbar
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium">
+                          {enabledTools.length} of {TOOLBAR_TOOLS.length} enabled
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Tool Grid */}
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {TOOLBAR_TOOLS.map((tool) => {
+                        const active = enabledTools.includes(tool.id);
+
+                        return (
+                          <button
+                            key={tool.id}
+                            onClick={() => toggleTool(tool.id)}
+                            className={cn(
+                              "relative p-4 rounded-lg border-2 transition-all text-left group hover:shadow-md",
+                              active
+                                ? "border-primary bg-primary/5 shadow-sm"
+                                : "border-border/60 hover:border-border bg-background"
+                            )}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="flex-shrink-0 mt-0.5">
+                                {getToolIcon(tool)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-semibold text-sm">
+                                    {tool.label}
+                                  </span>
+                                  {active && (
+                                    <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                                  )}
+                                </div>
+                                {tool.description && (
+                                  <p className="text-xs text-muted-foreground leading-relaxed">
+                                    {tool.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center justify-between pt-4 border-t border-border/50">
+                      <button
+                        onClick={handleResetToolbar}
+                        className="px-4 py-2 text-sm font-medium bg-muted hover:bg-muted/80 rounded-lg transition-colors"
+                      >
+                        Reset to Defaults
+                      </button>
+                      {toolbarSaved && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                          <Check className="w-4 h-4" />
+                          <span className="text-sm font-medium">Saved!</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

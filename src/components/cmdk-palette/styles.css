@@ -96,6 +96,13 @@
   font-size: 16px;
   color: #111827;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  width: 100%;
+}
+
+.cmdk-input-shell {
+  position: relative;
+  flex: 1;
+  min-width: 0;
 }
 
 .cmdk-input::placeholder {
@@ -108,6 +115,47 @@
   }
   .cmdk-input::placeholder {
     color: #6b7280;
+  }
+}
+
+/* Settings Button */
+.cmdk-settings-button {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cmdk-settings-button:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.cmdk-settings-button:active {
+  background: #e5e7eb;
+  transform: scale(0.95);
+}
+
+@media (prefers-color-scheme: dark) {
+  .cmdk-settings-button {
+    color: #9ca3af;
+  }
+  
+  .cmdk-settings-button:hover {
+    background: #374151;
+    color: #d1d5db;
+  }
+  
+  .cmdk-settings-button:active {
+    background: #4b5563;
   }
 }
 

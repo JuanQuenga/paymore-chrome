@@ -36,6 +36,9 @@ interface CMDKSettings {
   upcHighlighter: {
     enabled: boolean;
   };
+  ebaySummary: {
+    enabled: boolean;
+  };
 }
 
 const BASE_CMDK_SETTINGS: CMDKSettings = {
@@ -60,6 +63,9 @@ const BASE_CMDK_SETTINGS: CMDKSettings = {
   upcHighlighter: {
     enabled: true,
   },
+  ebaySummary: {
+    enabled: true,
+  },
 };
 
 const SOURCE_KEYS = Object.keys(
@@ -70,6 +76,7 @@ const createDefaultCmdkSettings = (): CMDKSettings => ({
   enabledSources: { ...BASE_CMDK_SETTINGS.enabledSources },
   sourceOrder: [...BASE_CMDK_SETTINGS.sourceOrder],
   upcHighlighter: { ...BASE_CMDK_SETTINGS.upcHighlighter },
+  ebaySummary: { ...BASE_CMDK_SETTINGS.ebaySummary },
 });
 
 const mergeCmdkSettings = (stored?: Partial<CMDKSettings>): CMDKSettings => {
@@ -102,6 +109,10 @@ const mergeCmdkSettings = (stored?: Partial<CMDKSettings>): CMDKSettings => {
       ...defaults.upcHighlighter,
       ...(stored.upcHighlighter || {}),
     },
+    ebaySummary: {
+      ...defaults.ebaySummary,
+      ...(stored.ebaySummary || {}),
+    },
   };
 };
 
@@ -114,6 +125,28 @@ const notifyUpcHighlighterChange = (enabled: boolean) => {
             chrome.tabs.sendMessage(
               tab.id,
               { action: "upc-highlighter-settings-changed", enabled },
+              () => void chrome.runtime.lastError
+            );
+          } catch (error) {
+            // Ignore tabs without listeners
+          }
+        }
+      });
+    });
+  } catch (error) {
+    // Ignore query failures
+  }
+};
+
+const notifyEbaySummaryChange = (enabled: boolean) => {
+  try {
+    chrome.tabs.query({}, (tabs: any[]) => {
+      tabs.forEach((tab) => {
+        if (typeof tab.id === "number") {
+          try {
+            chrome.tabs.sendMessage(
+              tab.id,
+              { action: "ebay-summary-settings-changed", enabled },
               () => void chrome.runtime.lastError
             );
           } catch (error) {
@@ -282,6 +315,19 @@ export function Settings() {
     setCmdkSettings(newSettings);
     chrome.storage.sync.set({ cmdkSettings: newSettings }, () => {
       notifyUpcHighlighterChange(enabled);
+    });
+  };
+
+  const handleToggleEbaySummary = (enabled: boolean) => {
+    const newSettings = {
+      ...cmdkSettings,
+      ebaySummary: {
+        enabled,
+      },
+    };
+    setCmdkSettings(newSettings);
+    chrome.storage.sync.set({ cmdkSettings: newSettings }, () => {
+      notifyEbaySummaryChange(enabled);
     });
   };
 
@@ -599,6 +645,32 @@ export function Settings() {
                 <Switch
                   checked={cmdkSettings.upcHighlighter.enabled}
                   onCheckedChange={(checked) => handleToggleUpcHighlighter(!!checked)}
+                />
+              </CardContent>
+            </AccordionContent>
+          </Card>
+        </AccordionItem>
+
+        <AccordionItem value="ebay" className="border-none">
+          <Card className="border-green-200">
+            <CardHeader>
+              <AccordionTrigger className="hover:no-underline">
+                <div>
+                  <CardTitle className="mb-2">Price Summary</CardTitle>
+                  <p className="text-sm text-muted-foreground font-normal">
+                    Automatically displays price summaries on eBay sold listings pages.
+                  </p>
+                </div>
+              </AccordionTrigger>
+            </CardHeader>
+            <AccordionContent>
+              <CardContent className="flex items-start justify-between gap-4 pt-0">
+                <div className="text-sm text-green-600">
+                  Shows average, median, high, and low prices with clickable metrics to jump to specific listings.
+                </div>
+                <Switch
+                  checked={cmdkSettings.ebaySummary.enabled}
+                  onCheckedChange={(checked) => handleToggleEbaySummary(!!checked)}
                 />
               </CardContent>
             </AccordionContent>

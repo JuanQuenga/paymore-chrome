@@ -4,6 +4,14 @@ The Paymore Chrome Extension is a lightweight tool designed specifically for Pay
 
 ## What's New (Since v1.0.4)
 
+### v1.0.14 - Smart UPC Detection & Quick Actions
+
+We've added powerful new tools to make your workflow even faster:
+
+- **UPC Highlighter** - Automatically detects 12-digit UPC codes on any webpage and makes them clickable to copy to your clipboard instantly
+- **eBay Price Summary** - When browsing eBay sold listings, see average, median, high, and low prices at the top with clickable metrics to jump to specific items
+- **Quick Actions Menu** - Enhanced right-click context menu with PayMore Quick Actions including Copy, Paste, Open in New Tab, and Save As
+
 ### v1.0.13 - Even More Search Options
 
 Right-click on any product number and you'll now see a new option:
