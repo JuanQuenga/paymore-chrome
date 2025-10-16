@@ -4,6 +4,12 @@ The Paymore Chrome Extension is a lightweight tool designed specifically for Pay
 
 ## What's New (Since v1.0.4)
 
+### v1.0.15 - Context Menu Stability Improvements
+
+We've made small but important fixes to improve context menu behavior on Windows and added an alternative modifier for native menu access:
+
+- **Context Menu** - Added `Ctrl+Right-Click` as an alternative way to open the native context menu without interference
+
 ### v1.0.14 - Smart UPC Detection & Quick Actions
 
 We've added powerful new tools to make your workflow even faster:

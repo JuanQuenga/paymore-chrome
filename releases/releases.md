@@ -4,7 +4,30 @@ Download the latest and previous versions of the Paymore Chrome Extension.
 
 ## Latest Release
 
-### v1.0.14 (Current)
+### v1.0.15 (Current)
+
+**Release Date:** October 16, 2025
+**Download:** [paymore-1.0.15-chrome.zip](./paymore-1.0.15-chrome.zip)
+
+**What's New:**
+
+### Features
+
+- **Quick Actions Context Menu** - Small stability improvements to context menu interactions
+
+### Improvements
+
+- **Context Menu Stability** - Improved handling around native context menu pass-through on Windows when modifier keys are used
+
+### Bug Fixes
+
+- Fixed native context menu closing immediately on Windows when holding `Alt` after right-click
+- Added `Ctrl+Right-Click` as an alternative to show the native context menu without interference
+- Implemented a short Windows-only suppression window to ignore duplicate/follow-up `contextmenu` events that could close the native menu
+
+---
+
+### v1.0.14 (Previous)
 
 **Release Date:** October 10, 2025
 **Download:** [paymore-1.0.14-chrome.zip](./paymore-1.0.14-chrome.zip)
