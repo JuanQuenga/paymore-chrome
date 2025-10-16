@@ -27,6 +27,8 @@ Download the latest and previous versions of the Paymore Chrome Extension.
 
 - Improved UPC code detection accuracy and highlighting
 - Better integration between content scripts and extension settings
+- Fixed content script temporal dead zone errors by hoisting initialization for `applyEnabledToolbarTools` and `enabledToolbarToolsCache`
+- Restored eBay Price Summary by correcting initialization order and guarding toolbar DOM availability before applying user preferences
 
 ---
 

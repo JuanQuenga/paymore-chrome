@@ -5,13 +5,32 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   modules: ["@wxt-dev/module-react"],
   // Use the official Tailwind v4 Vite plugin for class scanning + HMR.
-  vite: () => ({ plugins: [tailwindcss()] } as WxtViteConfig),
+  vite: () =>
+    ({
+      plugins: [tailwindcss()],
+      // Avoid identifier minification that can cause TDZ issues in content bundles
+      esbuild: {
+        minifyIdentifiers: false,
+        keepNames: true,
+      },
+      build: {
+        // Extra safety for terser/minify
+        terserOptions: {
+          mangle: false,
+          keep_classnames: true,
+          keep_fnames: true,
+        },
+      },
+    } as WxtViteConfig),
   outDir: ".output", // Base output directory
   outDirTemplate: "paymore", // Custom output directory name (removes browser/manifest folder nesting)
   manifest: {
     content_scripts: [
       {
         matches: ["<all_urls>"],
+        // Do not run the main content script on ebay sold search pages to avoid collisions
+        // with the dedicated ebay script below.
+        exclude_matches: ["https://www.ebay.com/sch/*"],
         js: ["content-scripts/content.js"],
         run_at: "document_idle",
         all_frames: true,
@@ -40,15 +59,9 @@ export default defineConfig({
         run_at: "document_idle",
         all_frames: false,
       },
-      {
-        matches: ["*://pos.paymore.tech/inventory*"],
-        js: ["content-pos-inventory.js"],
-        run_at: "document_idle",
-        all_frames: true,
-      },
     ],
     name: "Paymore",
-    version: "1.0.14",
+    version: "1.0.15",
     description: "Chrome extension for Paymore Employees.",
     permissions: [
       "storage",

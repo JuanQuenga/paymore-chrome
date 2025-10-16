@@ -126,6 +126,21 @@ function initializeExtension() {
   /** @type {boolean} Track user-initiated open to disable auto-hide */
   let manualOpen = false;
 
+  // Toolbar tools cache and sanitization, placed before first usage
+  let enabledToolbarToolsCache = [...DEFAULT_ENABLED_TOOLS];
+  const allToolbarToolIds = new Set(TOOLBAR_TOOLS.map((tool) => tool.id));
+
+  function sanitizeToolbarIds(value: any) {
+    if (!Array.isArray(value)) return null;
+    const unique = Array.from(
+      new Set(value.filter((id) => allToolbarToolIds.has(id)))
+    );
+    const uniqueSet = new Set(unique);
+    return TOOLBAR_TOOLS.filter((tool) => uniqueSet.has(tool.id)).map(
+      (tool) => tool.id
+    );
+  }
+
   // Block injection in iframes/embedded contexts
   try {
     const inFrame = (() => {
@@ -312,7 +327,10 @@ function initializeExtension() {
     attach("pm-tb-help", () => setActiveTool("help"));
     attach("pm-tb-settings", () => {
       try {
-        chrome.runtime.sendMessage({ action: "openInSidebar", tool: "settings" });
+        chrome.runtime.sendMessage({
+          action: "openInSidebar",
+          tool: "settings",
+        });
       } catch (e) {
         console.error("[Paymore CS] Failed to open settings in sidebar:", e);
       }
@@ -884,265 +902,31 @@ function initializeExtension() {
     };
 
     try {
-      // Check if we're on the POS inventory page
-      if (location.href.includes("pos.paymore.tech/inventory")) {
-        // Enhanced handling for POS inventory page with proper table structure
-        const inventoryRows = document.querySelectorAll(
-          'tr[class*="bg-light"], tr[class*="bg-light-danger"], tr[class*="bg-light-success"], tr[class*="bg-light-warning"]'
-        );
+      // General scanning logic for all websites
+      const productElements = document.querySelectorAll(
+        '[class*="product"], [class*="item"], [class*="sku"], [id*="product"], [id*="item"]'
+      );
+      productElements.forEach((element, index) => {
+        const name = element
+          .querySelector(
+            '[class*="name"], [class*="title"], h1, h2, h3, h4, h5, h6'
+          )
+          ?.textContent?.trim();
+        const price = element
+          .querySelector('[class*="price"], [class*="cost"], [class*="amount"]')
+          ?.textContent?.trim();
+        const sku = element
+          .querySelector('[class*="sku"], [class*="code"], [class*="id"]')
+          ?.textContent?.trim();
 
-        inventoryRows.forEach((row, index) => {
-          const cells = row.querySelectorAll("td");
-          if (cells.length >= 12) {
-            const orderId =
-              cells[1]?.textContent?.trim() || `Order-${index + 1}`;
-            const customerName = cells[2]?.textContent?.trim() || "Unknown";
-            const quantity = parseInt(cells[3]?.textContent?.trim()) || 0;
-            const paymentMethod = cells[4]?.textContent?.trim() || "";
-            const totalPrice = cells[5]?.textContent?.trim() || "";
-            const profit = cells[6]?.textContent?.trim() || "";
-            const profitPercentage = cells[7]?.textContent?.trim() || "";
-            const grade = cells[8]?.textContent?.trim() || "";
-            const date = cells[9]?.textContent?.trim() || "";
-            const employee = cells[10]?.textContent?.trim() || "";
-            const timeRemaining = cells[11]?.textContent?.trim() || "";
-
-            // Extract price values
-            const totalPriceValue =
-              parseFloat(totalPrice.replace(/[^0-9.-]/g, "")) || 0;
-            const profitValue =
-              parseFloat(profit.replace(/[^0-9.-]/g, "")) || 0;
-            const profitPercentValue =
-              parseFloat(profitPercentage.replace(/[^0-9.-]/g, "")) || 0;
-
-            // Check if this row is expandable and has sub-items
-            const isExpandable =
-              row.hasAttribute("data-bs-toggle") ||
-              row.querySelector('[data-bs-toggle="collapse"]');
-            const targetId =
-              row.getAttribute("data-bs-target") ||
-              row
-                .querySelector("[data-bs-target]")
-                ?.getAttribute("data-bs-target");
-
-            let subItems = [];
-            if (isExpandable && targetId) {
-              // Try to find expanded content
-              const expandedContent = document.querySelector(targetId);
-              if (expandedContent) {
-                const subRows = expandedContent.querySelectorAll("tr");
-                subRows.forEach((subRow, subIndex) => {
-                  const subCells = subRow.querySelectorAll("td");
-                  if (subCells.length >= 3) {
-                    const subItemName =
-                      subCells[0]?.textContent?.trim() ||
-                      `Sub-item ${subIndex + 1}`;
-                    const subItemPrice = subCells[1]?.textContent?.trim() || "";
-                    const subItemGrade = subCells[2]?.textContent?.trim() || "";
-
-                    const subItemPriceValue =
-                      parseFloat(subItemPrice.replace(/[^0-9.-]/g, "")) || 0;
-
-                    subItems.push({
-                      name: subItemName,
-                      price: subItemPriceValue,
-                      grade: subItemGrade,
-                      sku: `${orderId}-SUB-${subIndex + 1}`,
-                    });
-                  }
-                });
-              }
-
-              // If no expanded content found, try to trigger expansion
-              if (subItems.length === 0) {
-                try {
-                  // Try to find and click the expand button
-                  const expandBtn = row.querySelector(
-                    '[data-bs-toggle="collapse"]'
-                  );
-                  if (expandBtn) {
-                    // Create a temporary click event to expand
-                    const clickEvent = new MouseEvent("click", {
-                      bubbles: true,
-                      cancelable: true,
-                      view: window,
-                    });
-                    expandBtn.dispatchEvent(clickEvent);
-
-                    // Wait a bit for expansion animation
-                    setTimeout(() => {
-                      const expandedContent = document.querySelector(targetId);
-                      if (
-                        expandedContent &&
-                        expandedContent.classList.contains("show")
-                      ) {
-                        const subRows = expandedContent.querySelectorAll("tr");
-                        subRows.forEach((subRow, subIndex) => {
-                          const subCells = subRow.querySelectorAll("td");
-                          if (subCells.length >= 3) {
-                            const subItemName =
-                              subCells[0]?.textContent?.trim() ||
-                              `Sub-item ${subIndex + 1}`;
-                            const subItemPrice =
-                              subCells[1]?.textContent?.trim() || "";
-                            const subItemGrade =
-                              subCells[2]?.textContent?.trim() || "";
-
-                            const subItemPriceValue =
-                              parseFloat(
-                                subItemPrice.replace(/[^0-9.-]/g, "")
-                              ) || 0;
-
-                            subItems.push({
-                              name: subItemName,
-                              price: subItemPriceValue,
-                              grade: subItemGrade,
-                              sku: `${orderId}-SUB-${subIndex + 1}`,
-                            });
-                          }
-                        });
-                      }
-                    }, 100);
-                  }
-                } catch (error) {
-                  console.log("Could not expand row:", error);
-                }
-              }
-            }
-
-            // Create main order entry
-            const orderEntry = {
-              orderId: orderId,
-              customer: customerName,
-              quantity: quantity,
-              paymentMethod: paymentMethod,
-              totalPrice: totalPriceValue,
-              profit: profitValue,
-              profitPercentage: profitPercentValue,
-              grade: grade,
-              date: date,
-              employee: employee,
-              timeRemaining: timeRemaining,
-              subItems: subItems,
-              isMultiItem: quantity > 1 || subItems.length > 0,
-            };
-
-            data.orders.push(orderEntry);
-
-            // Create product entries for each item
-            if (subItems.length > 0) {
-              // Use sub-items if available
-              subItems.forEach((subItem, subIndex) => {
-                data.products.push({
-                  name: subItem.name,
-                  price: subItem.price,
-                  sku: subItem.sku,
-                  category: subItem.grade,
-                  stock: 1,
-                  customer: customerName,
-                  paymentMethod: paymentMethod,
-                  profit: subItem.price * (profitPercentValue / 100),
-                  profitPercentage: profitPercentValue,
-                  date: date,
-                  employee: employee,
-                  timeRemaining: timeRemaining,
-                  orderId: orderId,
-                  isSubItem: true,
-                });
-              });
-            } else {
-              // Create single product entry
-              data.products.push({
-                name: `${orderId} - ${customerName}`,
-                price: totalPriceValue,
-                sku: orderId,
-                category: grade,
-                stock: quantity,
-                customer: customerName,
-                paymentMethod: paymentMethod,
-                profit: profitValue,
-                profitPercentage: profitPercentValue,
-                date: date,
-                employee: employee,
-                timeRemaining: timeRemaining,
-                orderId: orderId,
-                isSubItem: false,
-              });
-            }
-
-            // Add customer if not already present
-            const existingCustomer = data.customers.find(
-              (c) => c.name === customerName
-            );
-            if (!existingCustomer) {
-              data.customers.push({
-                name: customerName,
-                email: `${customerName
-                  .toLowerCase()
-                  .replace(/\s+/g, ".")}@example.com`,
-                phone: `555-${String(index + 1).padStart(3, "0")}`,
-                totalSpent: totalPriceValue,
-                lastVisit: date,
-              });
-            }
-          }
-        });
-
-        // If no inventory rows found, try alternative selectors
-        if (data.products.length === 0) {
-          const allRows = document.querySelectorAll("tr");
-          allRows.forEach((row, index) => {
-            const cells = row.querySelectorAll("td");
-            if (cells.length >= 5) {
-              const itemId = cells[1]?.textContent?.trim();
-              const customerName = cells[2]?.textContent?.trim();
-              const quantity = cells[3]?.textContent?.trim();
-              const payment = cells[4]?.textContent?.trim();
-              const total = cells[5]?.textContent?.trim();
-
-              if (itemId && itemId !== "") {
-                data.products.push({
-                  name: `${itemId} - ${customerName || "Unknown"}`,
-                  price: parseFloat(total?.replace(/[^0-9.-]/g, "")) || 0,
-                  sku: itemId,
-                  category: "Inventory",
-                  stock: parseInt(quantity) || 0,
-                  customer: customerName || "Unknown",
-                  paymentMethod: payment || "Unknown",
-                });
-              }
-            }
+        if (name) {
+          data.products.push({
+            name: name || `Product ${index + 1}`,
+            price: parseFloat(price?.replace(/[^0-9.-]/g, "")) || 0,
+            stock: Math.floor(Math.random() * 100) + 1, // Placeholder
           });
         }
-      } else {
-        // Original scanning logic for other websites
-        const productElements = document.querySelectorAll(
-          '[class*="product"], [class*="item"], [class*="sku"], [id*="product"], [id*="item"]'
-        );
-        productElements.forEach((element, index) => {
-          const name = element
-            .querySelector(
-              '[class*="name"], [class*="title"], h1, h2, h3, h4, h5, h6'
-            )
-            ?.textContent?.trim();
-          const price = element
-            .querySelector(
-              '[class*="price"], [class*="cost"], [class*="amount"]'
-            )
-            ?.textContent?.trim();
-          const sku = element
-            .querySelector('[class*="sku"], [class*="code"], [class*="id"]')
-            ?.textContent?.trim();
-
-          if (name) {
-            data.products.push({
-              name: name || `Product ${index + 1}`,
-              price: parseFloat(price?.replace(/[^0-9.-]/g, "")) || 0,
-              stock: Math.floor(Math.random() * 100) + 1, // Placeholder
-            });
-          }
-        });
-      }
+      });
 
       // Scan for customer information
       const customerElements = document.querySelectorAll(
@@ -1254,21 +1038,7 @@ function initializeExtension() {
     return data;
   }
 
-  let enabledToolbarToolsCache = [...DEFAULT_ENABLED_TOOLS];
-  const allToolbarToolIds = new Set(TOOLBAR_TOOLS.map((tool) => tool.id));
-
-  const sanitizeToolbarIds = (value: any) => {
-    if (!Array.isArray(value)) return null;
-    const unique = Array.from(
-      new Set(value.filter((id) => allToolbarToolIds.has(id)))
-    );
-    const uniqueSet = new Set(unique);
-    return TOOLBAR_TOOLS.filter((tool) => uniqueSet.has(tool.id)).map(
-      (tool) => tool.id
-    );
-  };
-
-  const applyEnabledToolbarTools = () => {
+  function applyEnabledToolbarTools() {
     TOOLBAR_TOOLS.forEach((tool) => {
       const buttonId = getButtonId(tool.id);
       const button = document.getElementById(buttonId);
@@ -1336,7 +1106,7 @@ function initializeExtension() {
       divider.style.display =
         enabledToolbarToolsCache.length === 0 ? "none" : "";
     }
-  };
+  }
 
   async function loadEnabledTools() {
     return new Promise((resolve) => {

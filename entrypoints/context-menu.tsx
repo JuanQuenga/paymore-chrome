@@ -472,7 +472,11 @@ export default defineContentScript({
 
     const onScroll = () => closeMenu();
     const onContextMenuCapture = (e: MouseEvent) => {
-      // Prevent page context menus while ours is open
+      // Prevent page context menus while ours is open, but allow alt-click
+      if (e.altKey) {
+        // Don't interfere with native context menu on alt-click
+        return;
+      }
       e.stopPropagation();
       e.stopImmediatePropagation?.();
     };
@@ -679,7 +683,12 @@ export default defineContentScript({
 
     const onContextMenu = (e: MouseEvent) => {
       // Alt+right-click shows native menu, otherwise show PayMore menu
-      if (e.altKey || !enabled || dismissedUntilRefresh) return; // pass through
+      if (e.altKey || !enabled || dismissedUntilRefresh) {
+        // For alt-click, ensure we don't interfere with native context menu
+        // Remove any existing menu listeners temporarily to prevent flashing
+        document.removeEventListener("contextmenu", onContextMenuCapture, true);
+        return; // pass through
+      }
 
       e.preventDefault();
       e.stopPropagation();

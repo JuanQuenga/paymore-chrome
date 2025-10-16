@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Paymore Chrome Extension is a browser extension built with WXT (Web Extension Toolkit) and React. It provides tools for Shopify, price checking, and other e-commerce assistance specifically tailored for Paymore's operations. The extension includes a powerful CMDK command palette, popup interfaces, content scripts for interacting with web pages (e.g., POS inventory), background scripts, and side panels.
+The Paymore Chrome Extension is a browser extension built with WXT (Web Extension Toolkit) and React. It provides tools for Shopify, price checking, and other e-commerce assistance specifically tailored for Paymore's operations. The extension includes a powerful CMDK command palette, popup interfaces, content scripts for interacting with web pages, background scripts, and side panels.
 
 Key features:
 
@@ -111,7 +111,7 @@ paymore-chrome/
 ├── entrypoints/          # Extension entry points
 │   ├── background.ts     # Background script & command handlers
 │   ├── content.ts        # Main content script (toolbar integration)
-│   ├── content-pos-inventory.ts  # POS-specific content script
+
 │   ├── popup/            # CMDK Command Palette (default popup)
 │   ├── options/          # Extension options page
 │   ├── sidepanel/        # Side panel UI
@@ -158,7 +158,7 @@ paymore-chrome/
 ## Testing
 
 - **Manual Testing**: Load in Chrome and test popup, content scripts on target sites (e.g., Shopify POS).
-- **POS Inventory**: Use `debug-pos-inventory.js` in public/ for standalone testing.
+
 - **Unit Tests**: Add Jest or Vitest for component testing (not implemented yet).
 
 ## Deployment to Chrome Web Store

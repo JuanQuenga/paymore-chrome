@@ -2,7 +2,7 @@
   "name": "paymore",
   "description": "Chrome extension for Paymore Employees.",
   "private": true,
-  "version": "1.0.14",
+  "version": "1.0.15",
   "type": "module",
   "license": "AGPL-3.0-or-later",
   "scripts": {
