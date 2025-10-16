@@ -443,6 +443,10 @@ export default defineContentScript({
     let clickedElement: HTMLElement | null = null;
     let clickedUrl = "";
     let focusedElementBeforeMenu: HTMLElement | null = null;
+    // Windows-only quirk: after Alt+right-click, Chrome can dispatch a follow-up
+    // contextmenu without Alt that causes our capture handler to interfere and
+    // close the native menu. Track a short suppression window.
+    let suppressUntil = 0;
 
     const getSelectionText = () => {
       try {
@@ -475,6 +479,11 @@ export default defineContentScript({
       // Prevent page context menus while ours is open, but allow alt-click
       if (e.altKey) {
         // Don't interfere with native context menu on alt-click
+        return;
+      }
+      // If we're within suppression window (post Alt+RC on Windows), do not
+      // interfere so the native menu can remain open.
+      if (Date.now() < suppressUntil) {
         return;
       }
       e.stopPropagation();
@@ -687,6 +696,10 @@ export default defineContentScript({
         // For alt-click, ensure we don't interfere with native context menu
         // Remove any existing menu listeners temporarily to prevent flashing
         document.removeEventListener("contextmenu", onContextMenuCapture, true);
+        // On Windows, a stray non-Alt contextmenu may follow the Alt+click.
+        // Suppress our capture for a short window so native menu stays.
+        const isWindows = navigator.platform.toLowerCase().includes("win");
+        if (isWindows) suppressUntil = Date.now() + 350; // ~1/3 second
         return; // pass through
       }
 
