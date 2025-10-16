@@ -25,7 +25,7 @@ import {
  * Context Menu Content Script
  * - Light theme, rounded, shadowed menu
  * - Keyboard: Up/Down/Enter/Esc
- * - Alt+right-click => native menu
+ * - Alt+right-click (or Ctrl+right-click) => native menu
  * - Works everywhere including inputs/contentEditable
  */
 export default defineContentScript({
@@ -477,7 +477,7 @@ export default defineContentScript({
     const onScroll = () => closeMenu();
     const onContextMenuCapture = (e: MouseEvent) => {
       // Prevent page context menus while ours is open, but allow alt-click
-      if (e.altKey) {
+      if (e.altKey || e.ctrlKey) {
         // Don't interfere with native context menu on alt-click
         return;
       }
@@ -691,16 +691,19 @@ export default defineContentScript({
     };
 
     const onContextMenu = (e: MouseEvent) => {
-      // Alt+right-click shows native menu, otherwise show PayMore menu
-      if (e.altKey || !enabled || dismissedUntilRefresh) {
-        // For alt-click, ensure we don't interfere with native context menu
-        // Remove any existing menu listeners temporarily to prevent flashing
+      // Alt/Ctrl+right-click shows native menu, otherwise show PayMore menu
+      if (e.altKey) {
         document.removeEventListener("contextmenu", onContextMenuCapture, true);
-        // On Windows, a stray non-Alt contextmenu may follow the Alt+click.
-        // Suppress our capture for a short window so native menu stays.
         const isWindows = navigator.platform.toLowerCase().includes("win");
-        if (isWindows) suppressUntil = Date.now() + 350; // ~1/3 second
-        return; // pass through
+        if (isWindows) suppressUntil = Date.now() + 350;
+        return;
+      }
+      if (e.ctrlKey) {
+        document.removeEventListener("contextmenu", onContextMenuCapture, true);
+        return;
+      }
+      if (!enabled || dismissedUntilRefresh) {
+        return;
       }
 
       e.preventDefault();
