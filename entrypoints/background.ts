@@ -69,6 +69,12 @@ export default defineBackground({
 
     log("Service worker booted", { time: new Date().toISOString() });
 
+    // Handle extension icon clicks - open settings in new tab
+    chrome.action.onClicked.addListener(() => {
+      log("Extension icon clicked, opening options page");
+      chrome.runtime.openOptionsPage();
+    });
+
     // Track previous active tab for CMDK "return to previous tab" feature
     let previousActiveTabId = null;
     let lastActiveTabId = null;
@@ -125,9 +131,7 @@ export default defineBackground({
         });
       } else if (command === "open-options") {
         log("Open options command triggered");
-        openOptionsAsActionPopup().catch((error) =>
-          log("openOptions command handler error", error)
-        );
+        chrome.runtime.openOptionsPage();
       } else if (command === "open-toolbar-sidepanel") {
         log("Open toolbar sidepanel command triggered");
         chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
@@ -641,14 +645,20 @@ export default defineBackground({
           return true;
         }
         case "OPEN_OPTIONS": {
-          openOptionsAsActionPopup()
-            .then((opened) => {
-              sendResponse({ success: opened });
-            })
-            .catch((error) => {
-              log("OPEN_OPTIONS handler error", error);
-              sendResponse({ success: false, error: String(error) });
+          try {
+            chrome.runtime.openOptionsPage(() => {
+              const error = chrome.runtime.lastError;
+              if (error) {
+                log("OPEN_OPTIONS handler error", error);
+                sendResponse({ success: false, error: error.message });
+              } else {
+                sendResponse({ success: true });
+              }
             });
+          } catch (error) {
+            log("OPEN_OPTIONS handler error", error);
+            sendResponse({ success: false, error: String(error) });
+          }
           return true;
         }
         case "hideControllerModal":
@@ -954,6 +964,40 @@ export default defineBackground({
           });
           sendResponse({ success: true });
           break;
+        }
+        case "downloadFile": {
+          const url = message?.url;
+          if (!url) {
+            sendResponse({ success: false, error: "missing_url" });
+            break;
+          }
+          try {
+            chrome.downloads.download({ url }, (downloadId) => {
+              if (chrome.runtime.lastError) {
+                log("Download error:", chrome.runtime.lastError);
+                sendResponse({
+                  success: false,
+                  error: chrome.runtime.lastError.message,
+                });
+              } else {
+                sendResponse({ success: true, downloadId });
+              }
+            });
+          } catch (error) {
+            log("Download error:", error);
+            sendResponse({ success: false, error: String(error) });
+          }
+          return true;
+        }
+        case "open-settings": {
+          const section = message?.section || "";
+          const url = section
+            ? chrome.runtime.getURL(`options.html#${section}`)
+            : chrome.runtime.getURL("options.html");
+          chrome.tabs.create({ url, active: true }, (tab) => {
+            sendResponse({ success: true, tabId: tab?.id });
+          });
+          return true;
         }
         default:
           log("Unknown action", message?.action);

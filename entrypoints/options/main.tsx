@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
-import Popup from "../popup/Popup";
-import "../popup/popup.css";
+import SettingsPage from "../../src/components/pages/SettingsPage";
+import "./options.css";
 
 /**
  * @fileoverview PayMore Chrome Extension Options/Settings Page
@@ -14,6 +14,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const container = document.getElementById("root");
   if (container) {
     const root = createRoot(container);
-    root.render(<Popup />);
+    root.render(<SettingsPage />);
   }
 });

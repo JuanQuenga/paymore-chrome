@@ -8,19 +8,41 @@ export default defineConfig({
   vite: () => ({ plugins: [tailwindcss()] } as WxtViteConfig),
   outDir: ".output", // Base output directory
   outDirTemplate: "paymore", // Custom output directory name (removes browser/manifest folder nesting)
-  contentScripts: [
-    {
-      matches: ["<all_urls>"],
-      entries: ["content", "toolbar-mount"],
-    },
-    {
-      matches: ["*://pos.paymore.tech/inventory*"],
-      entries: ["content-pos-inventory"],
-    },
-  ],
   manifest: {
+    content_scripts: [
+      {
+        matches: ["<all_urls>"],
+        js: ["content-scripts/content.js"],
+        run_at: "document_idle",
+        all_frames: true,
+      },
+      {
+        matches: ["<all_urls>"],
+        js: ["toolbar-mount.js"],
+        run_at: "document_idle",
+        all_frames: true,
+      },
+      {
+        matches: ["<all_urls>"],
+        js: ["context-menu.js"],
+        run_at: "document_idle",
+        all_frames: false,
+      },
+      {
+        matches: ["<all_urls>"],
+        js: ["upc-highlighter.js"],
+        run_at: "document_idle",
+        all_frames: true,
+      },
+      {
+        matches: ["*://pos.paymore.tech/inventory*"],
+        js: ["content-pos-inventory.js"],
+        run_at: "document_idle",
+        all_frames: true,
+      },
+    ],
     name: "Paymore",
-    version: "1.0.13",
+    version: "1.0.14",
     description: "Chrome extension for Paymore Employees.",
     permissions: [
       "storage",
@@ -34,6 +56,8 @@ export default defineConfig({
       // Needed for CMDK bookmarks and history
       "bookmarks",
       "history",
+      // Needed for Save As button in context menu
+      "downloads",
     ],
     host_permissions: ["<all_urls>"],
     icons: {
@@ -44,7 +68,6 @@ export default defineConfig({
     },
     action: {
       default_icon: "assets/images/brand.png",
-      default_popup: "popup.html",
     },
     side_panel: {
       default_path: "sidepanel.html",

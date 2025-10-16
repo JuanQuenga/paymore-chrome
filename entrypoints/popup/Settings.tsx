@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import type { DragEvent } from "react";
 import { Button } from "../../src/components/ui/button";
 import { Input } from "../../src/components/ui/input";
 import { Label } from "../../src/components/ui/label";
@@ -8,7 +9,6 @@ import {
   CardHeader,
   CardTitle,
 } from "../../src/components/ui/card";
-import { Checkbox } from "../../src/components/ui/checkbox";
 import { Toggle } from "../../src/components/ui/toggle";
 import { Switch } from "../../src/components/ui/switch";
 import {
@@ -33,9 +33,12 @@ interface CMDKSettings {
     ebayCategories: boolean;
   };
   sourceOrder: string[];
+  upcHighlighter: {
+    enabled: boolean;
+  };
 }
 
-const DEFAULT_CMDK_SETTINGS: CMDKSettings = {
+const BASE_CMDK_SETTINGS: CMDKSettings = {
   enabledSources: {
     tabs: true,
     bookmarks: true,
@@ -54,6 +57,74 @@ const DEFAULT_CMDK_SETTINGS: CMDKSettings = {
     "searchProviders",
     "history",
   ],
+  upcHighlighter: {
+    enabled: true,
+  },
+};
+
+const SOURCE_KEYS = Object.keys(
+  BASE_CMDK_SETTINGS.enabledSources
+) as Array<keyof CMDKSettings["enabledSources"]>;
+
+const createDefaultCmdkSettings = (): CMDKSettings => ({
+  enabledSources: { ...BASE_CMDK_SETTINGS.enabledSources },
+  sourceOrder: [...BASE_CMDK_SETTINGS.sourceOrder],
+  upcHighlighter: { ...BASE_CMDK_SETTINGS.upcHighlighter },
+});
+
+const mergeCmdkSettings = (stored?: Partial<CMDKSettings>): CMDKSettings => {
+  const defaults = createDefaultCmdkSettings();
+  if (!stored) return defaults;
+
+  const enabledSources = {
+    ...defaults.enabledSources,
+    ...(stored.enabledSources || {}),
+  };
+
+  const sanitizedOrder = Array.isArray(stored.sourceOrder)
+    ? stored.sourceOrder.filter((key) =>
+        SOURCE_KEYS.includes(key as keyof CMDKSettings["enabledSources"])
+      )
+    : [];
+  const mergedOrder = [...sanitizedOrder];
+  SOURCE_KEYS.forEach((key) => {
+    if (!mergedOrder.includes(key)) {
+      mergedOrder.push(key);
+    }
+  });
+
+  return {
+    ...defaults,
+    ...stored,
+    enabledSources,
+    sourceOrder: mergedOrder,
+    upcHighlighter: {
+      ...defaults.upcHighlighter,
+      ...(stored.upcHighlighter || {}),
+    },
+  };
+};
+
+const notifyUpcHighlighterChange = (enabled: boolean) => {
+  try {
+    chrome.tabs.query({}, (tabs: any[]) => {
+      tabs.forEach((tab) => {
+        if (typeof tab.id === "number") {
+          try {
+            chrome.tabs.sendMessage(
+              tab.id,
+              { action: "upc-highlighter-settings-changed", enabled },
+              () => void chrome.runtime.lastError
+            );
+          } catch (error) {
+            // Ignore tabs without listeners
+          }
+        }
+      });
+    });
+  } catch (error) {
+    // Ignore query failures
+  }
 };
 
 export function Settings() {
@@ -63,7 +134,9 @@ export function Settings() {
   const [scannerBaseUrl, setScannerBaseUrl] = useState(HOSTED_URL);
   const [enabledTools, setEnabledTools] = useState<string[]>([]);
   const [toolbarTheme, setToolbarTheme] = useState<string>("stone");
-  const [cmdkSettings, setCmdkSettings] = useState<CMDKSettings>(DEFAULT_CMDK_SETTINGS);
+  const [cmdkSettings, setCmdkSettings] = useState<CMDKSettings>(
+    createDefaultCmdkSettings()
+  );
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -105,7 +178,7 @@ export function Settings() {
     // Load CMDK settings from chrome.storage.sync
     chrome.storage.sync.get(["cmdkSettings"], (result: any) => {
       if (result.cmdkSettings) {
-        setCmdkSettings(result.cmdkSettings);
+        setCmdkSettings(mergeCmdkSettings(result.cmdkSettings));
       }
     });
   }, []);
@@ -169,7 +242,7 @@ export function Settings() {
     setDraggedIndex(index);
   };
 
-  const handleDragOver = (e: React.DragEvent, index: number) => {
+  const handleDragOver = (e: DragEvent<HTMLDivElement>, index: number) => {
     e.preventDefault();
     if (draggedIndex === null || draggedIndex === index) return;
 
@@ -192,8 +265,24 @@ export function Settings() {
   };
 
   const handleResetCMDK = () => {
-    setCmdkSettings(DEFAULT_CMDK_SETTINGS);
-    chrome.storage.sync.set({ cmdkSettings: DEFAULT_CMDK_SETTINGS });
+    const defaults = createDefaultCmdkSettings();
+    setCmdkSettings(defaults);
+    chrome.storage.sync.set({ cmdkSettings: defaults }, () => {
+      notifyUpcHighlighterChange(defaults.upcHighlighter.enabled);
+    });
+  };
+
+  const handleToggleUpcHighlighter = (enabled: boolean) => {
+    const newSettings = {
+      ...cmdkSettings,
+      upcHighlighter: {
+        enabled,
+      },
+    };
+    setCmdkSettings(newSettings);
+    chrome.storage.sync.set({ cmdkSettings: newSettings }, () => {
+      notifyUpcHighlighterChange(enabled);
+    });
   };
 
   const sourcesConfig = {
@@ -485,6 +574,32 @@ export function Settings() {
               Reset to Defaults
             </Button>
           </div>
+              </CardContent>
+            </AccordionContent>
+          </Card>
+        </AccordionItem>
+
+        <AccordionItem value="upc" className="border-none">
+          <Card className="border-stone-200">
+            <CardHeader>
+              <AccordionTrigger className="hover:no-underline">
+                <div>
+                  <CardTitle className="mb-2">UPC Highlighter</CardTitle>
+                  <p className="text-sm text-muted-foreground font-normal">
+                    Automatically detect 12-digit UPC codes on web pages and enable click-to-copy.
+                  </p>
+                </div>
+              </AccordionTrigger>
+            </CardHeader>
+            <AccordionContent>
+              <CardContent className="flex items-start justify-between gap-4 pt-0">
+                <div className="text-sm text-stone-600">
+                  Toggle this on to highlight UPC values inline while browsing inventory pages.
+                </div>
+                <Switch
+                  checked={cmdkSettings.upcHighlighter.enabled}
+                  onCheckedChange={(checked) => handleToggleUpcHighlighter(!!checked)}
+                />
               </CardContent>
             </AccordionContent>
           </Card>
